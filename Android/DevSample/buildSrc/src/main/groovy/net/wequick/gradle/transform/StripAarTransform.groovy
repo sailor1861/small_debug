@@ -15,16 +15,12 @@
  */
 package net.wequick.gradle.transform
 
-import com.android.build.api.transform.Context
+import com.android.build.api.transform.*
 import com.android.build.api.transform.QualifiedContent.ContentType
 import com.android.build.api.transform.QualifiedContent.Scope
-import com.android.build.api.transform.Format
-import com.android.build.api.transform.Transform
-import com.android.build.api.transform.TransformException
-import com.android.build.api.transform.TransformInput
-import com.android.build.api.transform.TransformOutputProvider
 import com.android.build.gradle.internal.pipeline.TransformManager
 import net.wequick.gradle.AppExtension
+import net.wequick.gradle.BasePlugin
 import org.apache.commons.io.FileUtils
 import org.gradle.api.Project
 import org.gradle.api.Task
@@ -60,26 +56,34 @@ public class StripAarTransform extends Transform {
         Project project = ((Task) context).project
         AppExtension small = project.small
 
+        // 获取需要排除的aar
         Set<String> splitPaths = []
         small.splitAars.each {
             splitPaths.add(new File(small.aarDir, "$it.group/$it.name").absolutePath)
         }
 
-        inputs.each {
+        BasePlugin.Log.header "[${project.name}] transform: splitAars($small.splitAars)"    //, splitPaths($splitPaths)
 
-            // Bypass the directories
+        inputs.each {
+            // Bypass the directories : 工程自身的class文件
             it.directoryInputs.each {
                 File dest = outputProvider.getContentLocation(
                         it.name, it.contentTypes, it.scopes, Format.DIRECTORY);
                 FileUtils.copyDirectory(it.file, dest)
+
+                // from build\intermediates\classes\release  to  build\intermediates\transforms\smallStripped\release\folders\1\1\6\ca52260a6ed6c26f52b0482c2779b4ceba2c313
+                BasePlugin.Log.success "[${project.name}] Bypass the directories(from $it.file to $dest)"
             }
 
-            // Filter the jars
+            // Filter the jars：过滤掉所有lib插件的依赖，保留普通compile的依赖
             it.jarInputs.each {
                 File src = it.file
                 def temp = splitPaths.find { src.absolutePath.indexOf(it) == 0 }
                 if (temp != null) {
                     // Ignores the jar that should split
+                    // build\intermediates\exploded-aar\com.android.support\appcompat-v7\23.2.1\jars\classes.jar
+                    // build\intermediates\exploded-aar\myutils\lib.utils\0.1.0\jars\classes.jar
+                    BasePlugin.Log.success "[${project.name}] Ignores the jar($src)"
                     return
                 }
 
@@ -107,10 +111,14 @@ public class StripAarTransform extends Transform {
                 } else {
                     moduleName = "${version.parentFile.parentFile.name}-${version.parentFile.name}"
                 }
+
                 String destName = "$moduleName-$versionName"
                 File dest = outputProvider.getContentLocation(
                         destName, it.contentTypes, it.scopes, Format.JAR)
                 FileUtils.copyFile(it.file, dest)
+
+                // from build\intermediates\exploded-aar\DevSample\jni_plugin\unspecified\jars\classes.jar  to  build\intermediates\transforms\smallStripped\release\jars\1\4\jni_plugin-unspecified.jar
+                BasePlugin.Log.success "[${project.name}] copyFile($it.file, $dest)"
             }
         }
     }

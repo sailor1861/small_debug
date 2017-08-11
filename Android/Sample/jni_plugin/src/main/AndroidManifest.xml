@@ -1,3 +1,10 @@
-<manifest package="com.example.hellojni">
+<manifest package="com.example.hellojni" xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- TestCase: 普通工程的Manifest，被正常合并到插件中 -->
+    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <uses-permission android:name="android.permission.INTERNET" />
 
+    <meta-data
+        android:name="autohometools_standalone"
+        android:value="true" />
 </manifest>

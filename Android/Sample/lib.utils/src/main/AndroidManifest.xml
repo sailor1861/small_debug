@@ -1,3 +1,6 @@
-<manifest package="net.wequick.example.small.lib.utils">
+<manifest package="net.wequick.example.small.lib.utils"
+          xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- TestCase: lib工程的Manifest，不能合并到插件中 -->
+    <uses-permission android:name="android.permission.READ_PHONE_STATE" />
 
 </manifest>

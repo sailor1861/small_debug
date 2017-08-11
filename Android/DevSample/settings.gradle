@@ -1,10 +1,17 @@
 include ':small'
 
+// 原始的
+//def externalModules = [
+//        ':app',
+//        ':app.main', ':app.home', ':app.detail', ':app.mine',
+//        ':web.about',
+//        ':lib.utils', ':lib.style', ':lib.afterutils', ':lib.analytics',
+//        ':jni_plugin'
+//] as String[]
 def externalModules = [
     ':app',
-    ':app.main', ':app.home', ':app.detail', ':app.mine',
-    ':web.about',
-    ':lib.utils', ':lib.style', ':lib.afterutils', ':lib.analytics',
+    ':app.mine',
+    ':lib.utils', ':lib.style', //':lib.afterutils', ':lib.analytics',
     ':jni_plugin'
 ] as String[]
 

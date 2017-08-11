@@ -48,13 +48,18 @@ public class AppExtension extends BundleExtension {
     /** File of resources.ap_ */
     File apFile
 
-    /** File of R.java */
+    /**
+     * File of R.java <br/>
+     * Application工程普通compile的R.java
+     */
     File rJavaFile
 
     /** File of merger.xml */
     File mergerXml
 
-    /** Public symbol file - public.txt */
+    /** Public symbol file - public.txt <br/>
+     *  工程自身的public.txt?
+     * */
     File publicSymbolFile
 
     /** Paths of aar to split */
@@ -63,7 +68,10 @@ public class AppExtension extends BundleExtension {
     /** Paths of aar to retain */
     Set<Map> retainedAars
 
-    /** File of split R.java */
+    /**
+     * File of split R.java <br/>
+     * 分离的R.java: 只有App自身的R.java: 未合成公共R前的App自身的R.java; 用于打包到插件自身包内;
+     */
     File splitRJavaFile
 
     LinkedHashMap<Integer, Integer> idMaps

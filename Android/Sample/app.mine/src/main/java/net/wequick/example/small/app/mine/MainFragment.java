@@ -2,9 +2,10 @@ package net.wequick.example.small.app.mine;
 
 import android.app.Activity;
 import android.content.Intent;
+import android.os.Bundle;
 import android.support.annotation.Keep;
 import android.support.v4.app.Fragment;
-import android.os.Bundle;
+import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -13,6 +14,7 @@ import android.widget.TextView;
 
 import com.example.hellojni.HelloPluginJni;
 import com.example.mylib.Greet;
+
 import net.wequick.example.small.lib.utils.UIUtils;
 
 import java.io.BufferedReader;
@@ -105,7 +107,21 @@ public class MainFragment extends Fragment {
                 break;
             case REQUEST_CODE_CONTACTS:
                 UIUtils.showToast(getContext(), "contact: " + data);
+                testLibPlugin();
                 break;
         }
     }
+
+    /**
+     * 测试业务插件，访问公共插件的资源; 看看资源ID是否一致！
+     */
+    private void testLibPlugin() {
+        // Java代码直接访问插件的资源
+        Log.i("", "testLibPlugin, resId: " + net.wequick.example.small.lib.utils.R.bool.my_test_bool + " " +
+                net.wequick.example.small.lib.utils.R.color.my_test_color2 + " " +
+                net.wequick.example.small.lib.utils.R.array.my_test_colors + " " +
+                net.wequick.example.small.lib.utils.R.mipmap.add);
+    }
+
+
 }

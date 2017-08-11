@@ -11,6 +11,7 @@
     <TextView android:id="@+id/section_label" android:layout_width="wrap_content"
         android:layout_height="wrap_content" />
 
+    <!-- 业务插件，引用公共插件的自定义资源 -->
     <net.wequick.example.small.lib.utils.MyTextView
         android:id="@+id/my_label"
         android:layout_width="wrap_content"

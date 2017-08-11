@@ -170,6 +170,7 @@ class RootPlugin extends BasePlugin {
         }
     }
 
+    /** 每一个子Project，buildLib 准备环境，执行公共事务 */
     void buildLib(Project lib) {
         def libName = lib.name
         def ext = (AndroidExtension) lib.small
@@ -233,7 +234,8 @@ class RootPlugin extends BasePlugin {
             into preApDir
             rename {preApName}
         }
-        // Copy R.txt
+
+        // Copy R.txt : 复制该lib工程的R文件，到公共的preIdsDir目录；所有lib工程编译一遍后，该目录下有所有需要的R文件了！
         def preIdsDir = small.preIdsDir
         if (!preIdsDir.exists()) preIdsDir.mkdir()
         def srcIdsFile = new File(aapt.textSymbolOutputDir, 'R.txt')

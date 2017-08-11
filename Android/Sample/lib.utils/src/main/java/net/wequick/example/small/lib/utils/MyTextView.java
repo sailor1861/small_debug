@@ -3,6 +3,7 @@ package net.wequick.example.small.lib.utils;
 import android.content.Context;
 import android.content.res.TypedArray;
 import android.util.AttributeSet;
+import android.util.Log;
 import android.widget.TextView;
 
 /**
@@ -32,5 +33,8 @@ public class MyTextView extends TextView {
         TypedArray ta = context.obtainStyledAttributes(attrs, R.styleable.MyTextView);
         String label = ta.getString(R.styleable.MyTextView_label);
         setText("MyTextView: " + label);
+
+        Log.i("", "" + R.bool.my_test_bool + " " + R.color.my_test_color2 + " " + R.array.my_test_colors + " " +
+                R.mipmap.add);
     }
 }

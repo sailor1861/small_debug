@@ -8,3 +8,4 @@ int color my_test_color2 0x73040001
 int dimen my_test_dimen 0x73050000
 int id my_test_id 0x73060000
 int integer my_test_integer 0x73070000
+int mipmap add 0x73080000

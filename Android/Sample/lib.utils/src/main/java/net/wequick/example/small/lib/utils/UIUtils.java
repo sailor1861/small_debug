@@ -3,6 +3,7 @@ package net.wequick.example.small.lib.utils;
 import android.content.DialogInterface;
 import android.support.v7.app.AlertDialog;
 import android.content.Context;
+import android.util.Log;
 import android.widget.Toast;
 
 /**
@@ -12,6 +13,7 @@ public class UIUtils {
     public static void showToast(Context context, String tips) {
         Toast toast = Toast.makeText(context, "lib.utils: " + tips, Toast.LENGTH_SHORT);
         toast.show();
+        Log.i("", "" + R.bool.my_test_bool + R.color.my_test_color2 + R.array.my_test_colors + R.dimen.my_test_dimen);
     }
 
     public static void alert(Context context, String tips) {
