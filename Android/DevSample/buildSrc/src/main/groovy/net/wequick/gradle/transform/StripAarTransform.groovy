@@ -117,7 +117,7 @@ public class StripAarTransform extends Transform {
                         destName, it.contentTypes, it.scopes, Format.JAR)
                 FileUtils.copyFile(it.file, dest)
 
-                // from build\intermediates\exploded-aar\DevSample\jni_plugin\unspecified\jars\classes.jar  to  build\intermediates\transforms\smallStripped\release\jars\1\4\jni_plugin-unspecified.jar
+                // from build\intermediates\exploded-aar\DevSample\jni_plugin\xxx\jars\classes.jar  to  build\intermediates\transforms\smallStripped\release\jars\1\4\jni_plugin-unspecified.jar
                 BasePlugin.Log.success "[${project.name}] copyFile($it.file, $dest)"
             }
         }
