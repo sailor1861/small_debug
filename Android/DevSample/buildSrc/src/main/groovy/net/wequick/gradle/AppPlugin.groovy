@@ -21,6 +21,7 @@ import com.android.build.gradle.internal.pipeline.IntermediateFolderUtils
 import com.android.build.gradle.internal.pipeline.TransformTask
 import com.android.build.gradle.internal.transforms.ProGuardTransform
 import com.android.build.gradle.tasks.MergeManifests
+import com.android.build.gradle.tasks.MergeResources
 import com.android.build.gradle.tasks.MergeSourceSetFolders
 import com.android.build.gradle.tasks.ProcessAndroidResources
 import com.android.sdklib.BuildToolInfo
@@ -800,6 +801,8 @@ class AppPlugin extends BundlePlugin {
     protected void hookVariantTask(BaseVariant variant) {
         hookMergeAssets(variant.mergeAssets)
 
+        hookRes(variant.mergeResources)
+
         hookProcessManifest(small.processManifest)
 
         hookAapt(small.aapt)
@@ -816,6 +819,25 @@ class AppPlugin extends BundlePlugin {
     }
 
     /**
+     * Hook MergeResources task to ingnores the lib.* res
+     * @param mergeResTask
+     */
+    private void hookRes(MergeResources mergeResTask) {
+        mergeResTask.doFirst { MergeResources it ->
+            it.inputResourceSets
+
+            // outputDir: build\intermediates\res\merged\release\
+            // input($it.inputResourceSets),
+            Log.header "[${project.name}] ----[Begin]-----mergeResTask($mergeResTask.name) MergeResources($it.name) Task.project($it.project.name)" +
+                    ";  output($it.outputDir)"
+            mergeResTask.inputResourceSets.each {
+                // sourceFiles: intermediates\exploded-aar\com.android.support\support-v4\23.2.1\res 可以排除掉！
+//                Log.success "[${project.name}] sourceFiles($it.sourceFiles)"
+            }
+        }
+    }
+
+            /**
      * Hook merge-assets task to ignores the lib.* assets
      * TODO: filter the assets while exploding aar
      * @param mergeAssetsTask
@@ -823,16 +845,16 @@ class AppPlugin extends BundlePlugin {
     private void hookMergeAssets(MergeSourceSetFolders mergeAssetsTask) {
         mergeAssetsTask.doFirst { MergeSourceSetFolders it ->
 
-            Log.header "[${project.name}] mergeAssetsTask($mergeAssetsTask.name) MergeSourceSetFolders($it.name) Task.project($it.project.name)"
+            Log.header "[${project.name}] mergeAssetsTask($mergeAssetsTask.name) MergeSourceSetFolders($it.name) "
 
             def stripPaths = new HashSet<File>()
             mergeAssetsTask.inputDirectorySets.each {
 //                Log.success "[${project.name}] check sourceFiles($it.sourceFiles) configName($it.configName)"
 
-                // 为啥过过来configName呢？ 就是版本号(23.2.1)
+                // 为啥过滤configName呢？ 就是版本号(23.2.1)
                 if (it.configName == 'main' || it.configName == 'release') return
 
-                // build\intermediates\exploded-aar\
+                // build\intermediates\exploded-aar\[packagename]\assets\
                 it.sourceFiles.each {
                     def version = it.parentFile
                     def name = version.parentFile
@@ -1017,7 +1039,6 @@ class AppPlugin extends BundlePlugin {
         aaptTask.doLast { ProcessAndroidResources it ->
             Log.header "[${project.name}] hookAapt aaptTask($aaptTask.name), ProcessAndroidResources($it.name): " +
                     "packageOutputFile($it.packageOutputFile), textSymbolOutputDir($it.textSymbolOutputDir) "
-            it.sourceOutputDir
 
             // Unpack resources.ap_ : \build\intermediates\res\resources-release.ap_
             File apFile = it.packageOutputFile
@@ -1033,13 +1054,15 @@ class AppPlugin extends BundlePlugin {
                 include 'res/**/*'
             }
 
-            // Debug, bake apFile
+            // Debug, bake apFile to compare two apFiles
 //            copyFile(apFile, apFile.getParent(), apFile.name + ".bak")
             org.apache.commons.io.FileUtils.copyFile(apFile, new File(apFile.getParent(), apFile.name + ".bak"))
 
             // Modify assets : 为啥最终生成的apFile，会比原始的多了一个assets呢？
             prepareSplit()
-            // 工程合成后的R.txt文件: 为啥业务插件，不传递R.txt
+
+            // 工程合成后的R.txt文件: 为啥业务插件，不传递R.txt, 不需要固定public.txt么？
+            // symbolFile: build\intermediates\symbols\release\R.txt
             File symbolFile = (small.type == PluginType.Library) ?
                     new File(it.textSymbolOutputDir, 'R.txt') : null
             // 工程合成后的R.java文件
@@ -1054,21 +1077,24 @@ class AppPlugin extends BundlePlugin {
 
             if (small.retainedTypes != null && small.retainedTypes.size() > 0) {
                 // 这两段无法理解; 只能反推; 屏蔽调后，看看打包结果如何，对比就能看出来作用！
+                // 处理res/目录
                 aapt.filterResources(small.retainedTypes, filteredResources)
-                Log.success "[${project.name}] split library res files... retainedTypes(${small.retainedTypes})" //${small.retainedTypes} , 打印太多， 先屏蔽
+                Log.success "[${project.name}] split library res files... retainedTypes()" //${small.retainedTypes} , 打印太多， 先屏蔽
 
-                // 修复PP段?
+                // 修复PP段? : 处理resources.arsc文件
                 aapt.filterPackage(small.retainedTypes, small.packageId, small.idMaps,
                         small.retainedStyleables, updatedResources)
-
-                Log.success "[${project.name}] slice asset package and reset package id...${small.packageId}"
+                Log.success "[${project.name}] slice asset package and reset package id...${small.packageId}"   //, idMaps($small.idMaps)
 
                 String pkg = small.packageName
+
+                // 重新生成R.java: 固定publicID, 后续javac编译class文件时，会应用到该类；
                 // Overwrite the aapt-generated R.java with full edition: build\generated\source\r\release\net\wequick\example\small\app\mine\R.java
                 aapt.generateRJava(small.rJavaFile, pkg, small.allTypes, small.allStyleables)
                 Log.success "[${project.name}] generateRJava($small.rJavaFile)"
 
-                // 生成small.splitRJavaFile文件: 仅插件自身资源ID
+                // 生成small.splitRJavaFile文件: 仅插件自身资源ID；
+                // 关键：该文件，最终打包到dex中！
                 // build\generated\source\r\small\net\wequick\example\small\app\mine\R.java
                 // Also generate a split edition for later re-compiling
                 aapt.generateRJava(small.splitRJavaFile, pkg,
@@ -1088,7 +1114,7 @@ class AppPlugin extends BundlePlugin {
 
                     def styleables = small.vendorStyleables[name]
                     aapt.generateRJava(r, aarPkg, types, styleables)
-                    Log.success "[${project.name}] Overwrite the retained vendor($name) R.java($r.name)"
+                    Log.success "[${project.name}] ----what？------Overwrite the retained vendor($name) R.java($r.name)"
                 }
 
                 // Remove unused R.java to fix the reference of shared library resource, issue #63
@@ -1127,6 +1153,7 @@ class AppPlugin extends BundlePlugin {
             String aaptExe = small.aapt.buildTools.getPath(BuildToolInfo.PathId.AAPT)
 
             // 更新AAPT结果：先删除，再重新添加；因为没有update命令
+            // 这一步更新*.ap_文件(包括assets/, res/, Manifest.xml, resource.arsc文件)
             // Delete filtered entries.
             // Cause there is no `aapt update' command supported, so for the updated resources
             // we also delete first and run `aapt add' later.
@@ -1158,8 +1185,8 @@ class AppPlugin extends BundlePlugin {
             // Dynamically provided jars
             it.classpath += project.files(getLibraryJars())
 
-            Log.header "[${project.name}] hookJavac Dynamically provided jars($it.classpath.asPath)" +
-                    " input($it.source.asPath) output($it.destinationDir)"
+//            Log.header "[${project.name}] hookJavac Dynamically provided jars($it.classpath.asPath)" +
+//                    " input($it.source.asPath) output($it.destinationDir)"
         }
 
         javac.doLast { JavaCompile it ->

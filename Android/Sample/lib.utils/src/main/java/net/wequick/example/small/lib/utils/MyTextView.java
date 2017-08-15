@@ -34,7 +34,9 @@ public class MyTextView extends TextView {
         String label = ta.getString(R.styleable.MyTextView_label);
         setText("MyTextView: " + label);
 
-        Log.i("", "" + R.bool.my_test_bool + " " + R.color.my_test_color2 + " " + R.array.my_test_colors + " " +
-                R.mipmap.add);
+        Log.i("", "MyTextView " + Integer.toHexString(R.bool.my_test_bool) + " " +
+                Integer.toHexString(R.color.my_test_color1) + " " +
+                Integer.toHexString(R.color.my_test_color2) + " " +
+                Integer.toHexString(R.mipmap.add));
     }
 }

@@ -22,6 +22,8 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 
+import static net.wequick.small.Small.getContext;
+
 /**
  * Created by galen on 15/11/12.
  */
@@ -115,12 +117,16 @@ public class MainFragment extends Fragment {
     /**
      * 测试业务插件，访问公共插件的资源; 看看资源ID是否一致！
      */
-    private void testLibPlugin() {
+    public static void testLibPlugin() {
         // Java代码直接访问插件的资源
-        Log.i("", "testLibPlugin, resId: " + net.wequick.example.small.lib.utils.R.bool.my_test_bool + " " +
-                net.wequick.example.small.lib.utils.R.color.my_test_color2 + " " +
-                net.wequick.example.small.lib.utils.R.array.my_test_colors + " " +
-                net.wequick.example.small.lib.utils.R.mipmap.add);
+        Log.i("app.mine", "testLibPlugin, resId: " + Integer.toHexString(R.bool.my_test_bool) + " " +
+                Integer.toHexString(R.color.my_test_color1) + " " +
+                Integer.toHexString(R.color.my_test_color2) + " " +
+                Integer.toHexString(R.mipmap.add));
+//        Log.i("", "testLibPlugin, resId: " + net.wequick.example.small.lib.utils.R.bool.my_test_bool + " " +
+//                net.wequick.example.small.lib.utils.R.color.my_test_color2 + " " +
+//                net.wequick.example.small.lib.utils.R.array.my_test_colors + " " +
+//                net.wequick.example.small.lib.utils.R.mipmap.add);
     }
 
 
