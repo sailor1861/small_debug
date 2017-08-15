@@ -72,7 +72,7 @@ public class StripAarTransform extends Transform {
                 FileUtils.copyDirectory(it.file, dest)
 
                 // from build\intermediates\classes\release  to  build\intermediates\transforms\smallStripped\release\folders\1\1\6\ca52260a6ed6c26f52b0482c2779b4ceba2c313
-                BasePlugin.Log.success "[${project.name}] Bypass the directories(from $it.file to $dest)"
+//                BasePlugin.Log.success "[${project.name}] Bypass the directories(from $it.file to $dest)"
             }
 
             // Filter the jars：过滤掉所有lib插件的依赖，保留普通compile的依赖
@@ -83,7 +83,7 @@ public class StripAarTransform extends Transform {
                     // Ignores the jar that should split
                     // build\intermediates\exploded-aar\com.android.support\appcompat-v7\23.2.1\jars\classes.jar
                     // build\intermediates\exploded-aar\myutils\lib.utils\0.1.0\jars\classes.jar
-                    BasePlugin.Log.success "[${project.name}] Ignores the jar($src)"
+//                    BasePlugin.Log.success "[${project.name}] Ignores the jar($src)"
                     return
                 }
 
@@ -118,7 +118,7 @@ public class StripAarTransform extends Transform {
                 FileUtils.copyFile(it.file, dest)
 
                 // from build\intermediates\exploded-aar\DevSample\jni_plugin\xxx\jars\classes.jar  to  build\intermediates\transforms\smallStripped\release\jars\1\4\jni_plugin-unspecified.jar
-                BasePlugin.Log.success "[${project.name}] copyFile($it.file, $dest)"
+//                BasePlugin.Log.success "[${project.name}] copyFile($it.file, $dest)"
             }
         }
     }
