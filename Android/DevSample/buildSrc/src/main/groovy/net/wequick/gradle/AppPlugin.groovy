@@ -805,7 +805,7 @@ class AppPlugin extends BundlePlugin {
 
         hookProcessManifest(small.processManifest)
 
-        hookAapt(small.aapt)
+//        hookAapt(small.aapt)
 
         hookJavac(small.javac, variant.buildType.minifyEnabled)
 
@@ -835,6 +835,27 @@ class AppPlugin extends BundlePlugin {
 //                Log.success "[${project.name}] sourceFiles($it.sourceFiles)"
             }
         }
+
+        applyPublicXml(mergeResTask)
+    }
+
+    /**
+     * 应用public.xml
+     */
+    private void applyPublicXml(MergeResources mergeResTask) {
+        Log.header "[${project.name}] applyPublicXml, mergeResTask($mergeResTask.name)"
+        mergeResTask.doLast {
+                project.copy {
+                    int i = 0
+                    from(android.sourceSets.main.res.srcDirs) {
+                        include 'values/public.xml'
+                        rename 'public.xml', (i++ == 0 ? "public.xml" : "public_${i}.xml")
+                    }
+                    println('application public xml.')
+                    into(mergeResTask.outputDir)
+                }
+                Log.success "[${project.name}] copy ($android.sourceSets.main.res.srcDirs) to ($mergeResTask.outputDir)"
+            }
     }
 
             /**
@@ -1077,7 +1098,7 @@ class AppPlugin extends BundlePlugin {
 
             if (small.retainedTypes != null && small.retainedTypes.size() > 0) {
                 // 这两段无法理解; 只能反推; 屏蔽调后，看看打包结果如何，对比就能看出来作用！
-                // 处理res/目录
+                // 过滤res/目录
                 aapt.filterResources(small.retainedTypes, filteredResources)
                 Log.success "[${project.name}] split library res files... retainedTypes()" //${small.retainedTypes} , 打印太多， 先屏蔽
 
