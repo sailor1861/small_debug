@@ -824,16 +824,54 @@ class AppPlugin extends BundlePlugin {
      */
     private void hookRes(MergeResources mergeResTask) {
         mergeResTask.doFirst { MergeResources it ->
-            it.inputResourceSets
-
             // outputDir: build\intermediates\res\merged\release\
             // input($it.inputResourceSets),
-            Log.header "[${project.name}] ----[Begin]-----mergeResTask($mergeResTask.name) MergeResources($it.name) Task.project($it.project.name)" +
+            Log.header "[${project.name}] ----[Begin]----- MergeResources($it.name)" +
                     ";  output($it.outputDir)"
+
+            def stripPaths = new HashSet<File>()
             mergeResTask.inputResourceSets.each {
                 // sourceFiles: intermediates\exploded-aar\com.android.support\support-v4\23.2.1\res 可以排除掉！
-//                Log.success "[${project.name}] sourceFiles($it.sourceFiles)"
+//                Log.success "[${project.name}] sourceFiles($it.sourceFiles), configName($it.configName)"
+
+                // configName: 对于aar，就是版本号(23.2.1)；对于Module，一般都是(main, release)
+                if (it.configName == 'main' || it.configName == 'release') return
+
+                // build\intermediates\exploded-aar\[packagename\name\version]\res\
+                it.sourceFiles.each {
+                    def version = it.parentFile
+                    def name = version.parentFile
+                    def group = name.parentFile
+                    def aar = [group: group.name, name: name.name, version: version.name]
+                    // 如果非普通compile依赖，则需要过滤掉这个aar包的资源！ --即ProvidedCompile的概念
+                    if (!mUserLibAars.contains(aar)) {
+                        stripPaths.add(it)
+                    }
+                }
             }
+            Log.success "[${project.name}] split library res files... $stripPaths"
+
+            // 重命名ProvidedCompile的aar内的res/
+            def filteredRes = []
+            stripPaths.each {
+                def backup = new File(it.parentFile, "$it.name~")
+                filteredRes.add(org: it, backup: backup)
+                it.renameTo(backup)
+//                Log.success "[${project.name}] rename($it) to($backup)"
+            }
+
+            // 通过扩展的方式，添加成员变量，以便doLast时，能够恢复;
+            it.extensions.add('filteredRes', filteredRes)
+        }
+
+        // 重新恢复ProvidedAar
+        mergeResTask.doLast {
+            Set<Map> filteredRes = (Set<Map>) it.extensions.getByName('filteredRes')
+            filteredRes.each {
+                it.backup.renameTo(it.org)
+            }
+
+            Log.footer "[${project.name}] gen MergeRes($mergeResTask.outputDir)"
         }
 
         applyPublicXml(mergeResTask)
@@ -843,19 +881,18 @@ class AppPlugin extends BundlePlugin {
      * 应用public.xml
      */
     private void applyPublicXml(MergeResources mergeResTask) {
-        Log.header "[${project.name}] applyPublicXml, mergeResTask($mergeResTask.name)"
         mergeResTask.doLast {
-                project.copy {
-                    int i = 0
-                    from(android.sourceSets.main.res.srcDirs) {
-                        include 'values/public.xml'
-                        rename 'public.xml', (i++ == 0 ? "public.xml" : "public_${i}.xml")
-                    }
-                    println('application public xml.')
-                    into(mergeResTask.outputDir)
+            Log.header "[${project.name}] applyPublicXml, mergeResTask($mergeResTask.name)"
+            project.copy {
+                int i = 0
+                from(android.sourceSets.main.res.srcDirs) {
+                    include 'values/public.xml'
+                    rename 'public.xml', (i++ == 0 ? "public.xml" : "public_${i}.xml")
                 }
-                Log.success "[${project.name}] copy ($android.sourceSets.main.res.srcDirs) to ($mergeResTask.outputDir)"
+                into(mergeResTask.outputDir)
             }
+            Log.success "[${project.name}] copy ($android.sourceSets.main.res.srcDirs) to ($mergeResTask.outputDir)"
+        }
     }
 
             /**
@@ -872,7 +909,7 @@ class AppPlugin extends BundlePlugin {
             mergeAssetsTask.inputDirectorySets.each {
 //                Log.success "[${project.name}] check sourceFiles($it.sourceFiles) configName($it.configName)"
 
-                // 为啥过滤configName呢？ 就是版本号(23.2.1)
+                // configName: 对于aar，就是版本号(23.2.1)；对于Module，一般都是(main, release)
                 if (it.configName == 'main' || it.configName == 'release') return
 
                 // build\intermediates\exploded-aar\[packagename]\assets\
