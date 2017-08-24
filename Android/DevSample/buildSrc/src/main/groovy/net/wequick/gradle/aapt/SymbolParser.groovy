@@ -86,7 +86,8 @@ public final class SymbolParser {
     }
 
     /**
-     * Get entries data of each line
+     * Get entries data of each line <br/>
+     * 返回数据结构 Map<String, Map<>>
      * @param file
      * @return
      */

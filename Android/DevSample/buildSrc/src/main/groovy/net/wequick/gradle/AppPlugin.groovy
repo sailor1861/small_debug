@@ -449,16 +449,19 @@ class AppPlugin extends BundlePlugin {
             }
         }
 
-        // 添加所有普通compile的aar
+        // 添加所有普通compile的aar ： 目的仅仅是为了vendor types and styleables，使用！
         // Add user retained aars for generating their R.java, fix #194
         if (small.retainedAars != null) {
             transitiveVendorAars.addAll(small.retainedAars.collect {
                 [path: "$it.group/$it.name/$it.version", version: it.version]
             })
         }
+        Log.success "add transitiveVendorAars($transitiveVendorAars), publicSymbolFile($small.publicSymbolFile)"
 
-        // 从rootSmall.preIdsDir找到非本工程的所有lib库(公共插件)的R.txt文件
+        // 从rootSmall.preIdsDir找到非本工程的所有lib库(公共插件)的R.txt文件; 这些资源均是需要过滤掉的
+        // 目的：生成staticIdMaps();
         // Q: 依赖的lib库的R.txt，如何获取？
+        // A: buildLib时，生成到该目录的
         // Prepare id maps (bundle resource id -> library resource id)
         def libEntries = [:]
         rootSmall.preIdsDir.listFiles().each {
@@ -468,21 +471,26 @@ class AppPlugin extends BundlePlugin {
         }
         /** 工程自身的public.txt */
         def publicEntries = SymbolParser.getResourceEntries(small.publicSymbolFile)
+        /** 工程自身的R.txt：AAPT编译产物，基于他过滤出retianedEntries */
         def bundleEntries = SymbolParser.getResourceEntries(idsFile)
+        /** 所有修改的资源ID映射表：IdMaps<bundleId, libId> */
         def staticIdMaps = [:]
         def staticIdStrMaps = [:]
-        /** lib库的 */
+        /** 工程需要保留的资源：中间产物，目的是生成retainedTypes这个最终产物 */
         def retainedEntries = []
-        /** 工程自身的 */
+        /** 工程需要保留的public资源：对应工程自身的Public.txt */
         def retainedPublicEntries = []
         def retainedStyleables = []
         def reservedKeys = getReservedResourceKeys()
+        Log.success "reservedKeys($reservedKeys)"
 
         bundleEntries.each { k, Map be ->
             be._typeId = UNSET_TYPEID // for sort
             be._entryId = UNSET_ENTRYID
 
-            // 替换工程自身的public.txt
+            // 实现public固定资源ID: 用public.txt，替换R.txt; 以便后续重新javaC生成R.java
+            // Q: 为啥不替换PP段？ 固定的资源ID呀！
+            // A: 因为是bundle工程自身的资源，PP段，肯定就是bundle的packageId；所以，这里就不处理了？
             Map le = publicEntries.get(k)
             if (le != null) {
                 // Use last built id
@@ -493,12 +501,13 @@ class AppPlugin extends BundlePlugin {
                 return
             }
 
+            // 添加到保留资源列表
             if (reservedKeys.contains(k)) {
                 be.isStyleable ? retainedStyleables.add(be) : retainedEntries.add(be)
                 return
             }
 
-            // 替换所有lib库的public.txt
+            // 记录所有在lib库的public.txt内的资源ID
             le = libEntries.get(k)
             if (le != null) {
                 // Add static id maps to host or library resources and map it later at
@@ -513,10 +522,13 @@ class AppPlugin extends BundlePlugin {
 //                throw new Exception(
 //                        "Missing library resource entry: \"$k\", try to cleanLib and buildLib.")
 //            }
+
+            // Q: 为什么最后还需要再添加呢？
             be.isStyleable ? retainedStyleables.add(be) : retainedEntries.add(be)
         }
 
-        // 保留所有已经被删除的public.txt资源！
+        // 保留所有已经被删除的public.txt资源: 前面已经过滤过，剩余的就是已经被bundle删除掉的.
+        // Q: 这种也需要保留么？
         // TODO: retain deleted public entries
         if (publicEntries.size() > 0) {
             publicEntries.each { k, e ->
@@ -538,7 +550,7 @@ class AppPlugin extends BundlePlugin {
             return
         }
 
-        // Prepare public types
+        // Prepare public types : 准备Public.txt资源，为后续重新分配资源ID
         def publicTypes = [:]
         def maxPublicTypeId = 0
         def unusedTypeIds = [] as Queue
@@ -575,6 +587,8 @@ class AppPlugin extends BundlePlugin {
             a.typeId <=> b.typeId ?: a.entryId <=> b.entryId
         }
 
+        // 重新分配资源ID：因为public.txt内的资源会随机占用了资源ID段; 会与原始AAPT产物有冲突;
+        // 这一步会合并 etainedEntries += retainedPublicEntries
         // Reassign resource type id (_typeId) and entry id (_entryId)
         def lastEntryIds = [:]
         if (retainedEntries.size() > 0) {
@@ -623,13 +637,15 @@ class AppPlugin extends BundlePlugin {
             retainedEntries = retainedPublicEntries
         }
 
+        // 按照typeId -> entryId 顺序排列，以方便后续生成retainedTypes
         // Resort with reassigned resources order
         retainedEntries.sort { a, b ->
             a._typeId <=> b._typeId ?: a._entryId <=> b._entryId
         }
 
+        // 前面处理完所有资源Entries后，开始生成retainedTypes(这个是最终产物)
         // Resort retained resources
-        def retainedTypes = []
+        def retainedTypes = []  // List<Map<,,,,Map<>>>
         def pid = (small.packageId << 24)
         def currType = null
         retainedEntries.each { e ->
@@ -639,11 +655,13 @@ class AppPlugin extends BundlePlugin {
                 currType = [type: e.vtype, name: e.type, id: e.typeId, _id: e._typeId, entries: []]
                 retainedTypes.add(currType)
             }
+            // 记录所有IdMaps: 后续，修改XML资源ID时，需要用到
             def newResId = pid | (e._typeId << 16) | e._entryId
             def newResIdStr = "0x${Integer.toHexString(newResId)}"
-            staticIdMaps.put(e.id, newResId)
+            staticIdMaps.put(e.id, newResId)    // 前面已经处理过libEntries(肯定是public固定的), 这里处理剩余的工程自身的ID，因此需要在分配资源后再处理;
             staticIdStrMaps.put(e.idStr, newResIdStr)
 
+            // Q: 不大懂？
             // Prepare styleable id maps for resolving R.java
             if (retainedStyleables.size() > 0 && e.typeId == 1) {
                 retainedStyleables.findAll { it.idStrs != null }.each {
@@ -661,6 +679,7 @@ class AppPlugin extends BundlePlugin {
             currType.entries.add(entry)
         }
 
+        // Q: 不懂
         // Update the id array for styleables
         retainedStyleables.findAll { it.mapped != null }.each {
             it.idStr = "{ ${it.idStrs.join(', ')} }"
@@ -767,8 +786,11 @@ class AppPlugin extends BundlePlugin {
         small.allTypes = allTypes
         small.allStyleables = allStyleables
 
+        // 这一块，不太懂，用处是什么
         small.vendorTypes = vendorTypes
         small.vendorStyleables = vendorStyleables
+
+        Log.success "retainedStyleables($retainedStyleables), vendorTypes($vendorTypes)"   //idMaps($staticIdStrMaps), 特别多的值！
     }
 
     protected int getABIFlag() {
@@ -801,11 +823,11 @@ class AppPlugin extends BundlePlugin {
     protected void hookVariantTask(BaseVariant variant) {
         hookMergeAssets(variant.mergeAssets)
 
-        hookRes(variant.mergeResources)
+//        hookRes(variant.mergeResources)
 
         hookProcessManifest(small.processManifest)
 
-//        hookAapt(small.aapt)
+        hookAapt(small.aapt)
 
         hookJavac(small.javac, variant.buildType.minifyEnabled)
 
@@ -843,9 +865,13 @@ class AppPlugin extends BundlePlugin {
                     def name = version.parentFile
                     def group = name.parentFile
                     def aar = [group: group.name, name: name.name, version: version.name]
+
                     // 如果非普通compile依赖，则需要过滤掉这个aar包的资源！ --即ProvidedCompile的概念
+                    // 注：res需要参与AAPT的编译过程， 所以不能过滤掉任何依赖资源！
                     if (!mUserLibAars.contains(aar)) {
-                        stripPaths.add(it)
+                    // 排除所有lib库的res文件
+//                    if (it.name.contains(':lib.')) {
+//                        stripPaths.add(it)
                     }
                 }
             }
@@ -1134,15 +1160,15 @@ class AppPlugin extends BundlePlugin {
             Log.success "[${project.name}] ReAapt symbolFile($symbolFile), rJavaFile($rJavaFile) unzipApDir($unzipApDir)"
 
             if (small.retainedTypes != null && small.retainedTypes.size() > 0) {
-                // 这两段无法理解; 只能反推; 屏蔽调后，看看打包结果如何，对比就能看出来作用！
-                // 过滤res/目录
+                // 这两段难理解; 只能反推; 屏蔽调后，看看打包结果如何，对比就能看出来作用！
+                // 过滤res/目录：排除掉filteredResources资源
                 aapt.filterResources(small.retainedTypes, filteredResources)
-                Log.success "[${project.name}] split library res files... retainedTypes()" //${small.retainedTypes} , 打印太多， 先屏蔽
+                Log.success "[${project.name}] split library res files... retainedTypes(${small.retainedTypes})" //${small.retainedTypes} , 打印太多， 先屏蔽
 
-                // 修复PP段? : 处理resources.arsc文件
+                // 修改资源ID：处理resources.arsc文件、XML文件、R.txt
                 aapt.filterPackage(small.retainedTypes, small.packageId, small.idMaps,
                         small.retainedStyleables, updatedResources)
-                Log.success "[${project.name}] slice asset package and reset package id...${small.packageId}"   //, idMaps($small.idMaps)
+                Log.success "[${project.name}] slice asset package and reset package id...${small.packageId}, updatedResources($updatedResources)"   //, idMaps($small.idMaps)
 
                 String pkg = small.packageName
 
@@ -1210,13 +1236,15 @@ class AppPlugin extends BundlePlugin {
 
             String aaptExe = small.aapt.buildTools.getPath(BuildToolInfo.PathId.AAPT)
 
-            // 更新AAPT结果：先删除，再重新添加；因为没有update命令
+            // 更新AAPT结果：先删除，再重新添加；因为没有update命令；
+            //      添加文件，不涉及到编译过程，仅仅是更新压缩内的文件？  -- 所以，此时，清理资源是不会有影响的！
+            //      问题：为啥不是对unzip解压&过滤&修改过的文件，重新压缩下 即可？ 为啥要调用AAPT工具，重新对.ap_压缩包处理？
             // 这一步更新*.ap_文件(包括assets/, res/, Manifest.xml, resource.arsc文件)
             // Delete filtered entries.
             // Cause there is no `aapt update' command supported, so for the updated resources
             // we also delete first and run `aapt add' later.
-            filteredResources.addAll(updatedResources)
-            ZipUtils.with(apFile).deleteAll(filteredResources)
+            filteredResources.addAll(updatedResources)  // 添加Resource.arsc文件，各种有依赖lib资源的XML文件，也需要重新更新
+            ZipUtils.with(apFile).deleteAll(filteredResources)      //Q: unzip解压包中，已经过滤掉了，为啥还需要再处理.ap_压缩包呢？
 
             // Re-add updated entries.
             // $ aapt add resources.ap_ file1 file2 ...
@@ -1290,13 +1318,22 @@ class AppPlugin extends BundlePlugin {
         return keys
     }
 
+    /**
+     *
+     * @param config
+     * @param path
+     * @param outTypeEntries List<Map<type: type, name: name>>
+     * @param outStyleableKeys
+     */
     protected void collectReservedResourceKeys(config, path, outTypeEntries, outStyleableKeys) {
+        // 解析mergerXml文件: 通过config过滤出需要的资源包；默认情况下，仅本工程的资源！
         def merger = new XmlParser().parse(small.mergerXml)
         def filter = config == null ? {
             it.@config == 'main' || it.@config == 'release'
         } : {
             it.@config = config
         }
+
         def dataSets = merger.dataSet.findAll filter
         dataSets.each { // <dataSet config="main" generated-set="main$Generated">
             it.source.each { // <source path="**/${project.name}/src/main/res">
@@ -1312,6 +1349,7 @@ class AppPlugin extends BundlePlugin {
                         return
                     }
 
+                    // 如果没有type字段：继续遍历，children.name 来判断类型
                     it.children().each {
                         type = it.name()
                         def name = it.@name
@@ -1345,6 +1383,8 @@ class AppPlugin extends BundlePlugin {
                 }
             }
         }
+
+        Log.success "collectReservedResourceKeys(), mergerXml($small.mergerXml), outTypeEntries($outTypeEntries), outStyleableKeys($outStyleableKeys)"
     }
 
     /**

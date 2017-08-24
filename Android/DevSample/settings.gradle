@@ -12,9 +12,9 @@ include ':small'
 // Debug Gradle-Plugin 用
 def externalModules = [
     ':app',
-////    ':app.mine',
+    ':app.mine',
     ':lib.utils', ':lib.style', //':lib.afterutils', ':lib.analytics',
-//    ':jni_plugin'
+    ':jni_plugin'
 ] as String[]
 
 include externalModules

@@ -58,7 +58,7 @@ public class AppExtension extends BundleExtension {
     File mergerXml
 
     /** Public symbol file - public.txt <br/>
-     *  工程自身的public.txt?
+     *  工程自身的public.txt
      * */
     File publicSymbolFile
 
@@ -76,12 +76,18 @@ public class AppExtension extends BundleExtension {
 
     LinkedHashMap<Integer, Integer> idMaps
     LinkedHashMap<String, String> idStrMaps
+
+    /**
+     * "List(Map())"
+     */
     ArrayList retainedTypes
     ArrayList retainedStyleables
     Map<String, List> vendorTypes
     Map<String, List> vendorStyleables
 
-    /** List of all resource types */
+    /** List of all resource types
+     * Do this only for the modules who's code really use R.xx of lib.*
+     */
     ArrayList allTypes
 
     /** List of all resource styleables */

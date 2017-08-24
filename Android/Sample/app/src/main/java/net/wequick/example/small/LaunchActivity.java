@@ -5,6 +5,7 @@ import android.os.Build;
 import android.support.v7.app.ActionBar;
 import android.os.Bundle;
 import android.support.v7.app.AppCompatActivity;
+import android.util.Log;
 import android.view.View;
 import android.widget.TextView;
 
@@ -58,5 +59,10 @@ public class LaunchActivity extends AppCompatActivity {
                 finish();
             }
         });
+    }
+
+    private void testHostRes() {
+        Log.i("app.LaunchActivity", "app.LaunchActivity  android.R " + Integer.toHexString(android.R.style.Theme_Holo_Light_NoActionBar) +
+                " android.support.v7.appcompat.R" + Integer.toHexString(android.support.v7.appcompat.R.style.Theme_AppCompat_Light_NoActionBar));
     }
 }

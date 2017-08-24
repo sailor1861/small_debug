@@ -22,8 +22,6 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 
-import static net.wequick.small.Small.getContext;
-
 /**
  * Created by galen on 15/11/12.
  */
@@ -127,6 +125,9 @@ public class MainFragment extends Fragment {
 //                net.wequick.example.small.lib.utils.R.color.my_test_color2 + " " +
 //                net.wequick.example.small.lib.utils.R.array.my_test_colors + " " +
 //                net.wequick.example.small.lib.utils.R.mipmap.add);
+
+        Log.i("", "MyTextView  android.R " + Integer.toHexString(android.R.style.Theme_Holo_Light_NoActionBar) +
+                " android.support.v7.appcompat.R" + Integer.toHexString(android.support.v7.appcompat.R.style.Theme_AppCompat_Light_NoActionBar));
     }
 
 

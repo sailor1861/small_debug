@@ -65,6 +65,7 @@ public class ArscEditor extends AssetEditor {
     def slice(int pp, Map idMaps, List retainedTypes) {
         def t = readTable()
 
+        // 需要保留的数据 数组格式
         def retainedTypeSpecs = []
         def retainedStringIds = []
         def retainedTypeIds = []
@@ -91,7 +92,7 @@ public class ArscEditor extends AssetEditor {
             def ts = t.typeList.specs[it.id - 1]
             def es = it.entries
             def newEntryCount = es.size()
-            def d = (ts.entryCount - newEntryCount) * 4
+            def d = (ts.entryCount - newEntryCount) * 4 // 需要过滤掉的type
             ts.entryCount = newEntryCount
             // Filter flags
             def flags = []
@@ -200,6 +201,7 @@ public class ArscEditor extends AssetEditor {
                     }
                 }
 
+                // 空数据，过滤掉该type
                 if (emptyCount == ts.entryCount) return
 
                 it.entries = entries
