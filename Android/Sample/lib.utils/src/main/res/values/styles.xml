@@ -1,0 +1,13 @@
+<resources>
+
+    <!-- TestCase: 普通主题. -->
+    <style name="AppTheme.NoActionBar" parent="AppTheme.NoActionBar">
+        <!--<item name="windowActionBar">false</item>-->
+        <!--<item name="windowNoTitle">true</item>-->
+    </style>
+
+    <!-- TestCase: AppCompat主题，插件包必须支持AppCompat支持包 -->
+    <style name="AppTheme.AppBarOverlay" parent="ThemeOverlay.AppCompat.Dark.ActionBar" />
+    <style name="AppTheme.PopupOverlay" parent="ThemeOverlay.AppCompat.Light" />
+
+</resources>

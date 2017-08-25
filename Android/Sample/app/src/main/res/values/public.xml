@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <public type="color" name="colorPrimary" id="0x93040056" />
+    <public type="color" name="colorPrimaryDark" id="0x93040191" />
+    <public type="string" name="initializing" id="0x93050169" />
+</resources>

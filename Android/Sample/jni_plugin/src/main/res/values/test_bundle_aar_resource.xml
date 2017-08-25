@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Resource Types
+      @see http://developer.android.com/intl/zh-cn/guide/topics/resources/available-resources.html
+      @see http://developer.android.com/intl/zh-cn/guide/topics/resources/more-resources.html -->
+    <bool name="aar_test_bool">true</bool>
+    <color name="aar_test_color1">#FF6F</color>
+    <color name="aar_test_color2">#aF042F</color>
+    <dimen name="aar_test_dimen">31dp</dimen>
+    <item type="id" name="aar_test_id" />
+    <integer name="my_test_integer">1</integer>
+    <string name="aar_test_string">aar_test_string</string>
+</resources>

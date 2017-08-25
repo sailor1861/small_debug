@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <public type="color" name="my_test_color1" id="0x73040013" />
+    <public type="color" name="my_test_color2" id="0x73040011" />
+    <public type="mipmap" name="add" id="0x73080012" />
+</resources>
