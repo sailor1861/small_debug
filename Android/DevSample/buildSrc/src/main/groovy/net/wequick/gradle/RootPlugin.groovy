@@ -429,6 +429,7 @@ class RootPlugin extends BasePlugin {
                 into preJarDir
                 rename {"$libName-r.jar"}
             }
+            // \build\intermediates\packaged\release\classes.jar to DevSample\build-small\intermediates\small-pre-jar\base lib.utils-r.jar
             Log.success "copy($rJar) to($preJarDir $libName-r.jar)"
         }
         //  - copy dependencies jars
