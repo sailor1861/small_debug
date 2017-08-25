@@ -60,17 +60,26 @@ public class AppExtension extends BundleExtension {
     /** Paths of aar to retain */
     Set<Map> retainedAars
 
-    /** File of split R.java */
+    /**
+     * File of split R.java <br/>
+     * 分离的R.java: 只有App自身的R.java: 未合成公共R前的App自身的R.java; 用于打包到插件自身包内;
+     */
     File splitRJavaFile
 
     LinkedHashMap<Integer, Integer> idMaps
     LinkedHashMap<String, String> idStrMaps
+
+    /**
+     * "List(Map())"
+     */
     ArrayList retainedTypes
     ArrayList retainedStyleables
     Map<String, List> vendorTypes
     Map<String, List> vendorStyleables
 
-    /** List of all resource types */
+    /** List of all resource types
+     * Do this only for the modules who's code really use R.xx of lib.*
+     */
     ArrayList allTypes
 
     /** List of all resource styleables */

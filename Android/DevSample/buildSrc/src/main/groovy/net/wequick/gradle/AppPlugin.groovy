@@ -20,22 +20,16 @@ import com.android.build.gradle.api.BaseVariant
 import com.android.build.gradle.internal.pipeline.IntermediateFolderUtils
 import com.android.build.gradle.internal.pipeline.TransformTask
 import com.android.build.gradle.internal.transforms.ProGuardTransform
-import com.android.build.gradle.tasks.ProcessTestManifest
 import com.android.build.gradle.tasks.MergeManifests
 import com.android.build.gradle.tasks.MergeSourceSetFolders
 import com.android.build.gradle.tasks.ProcessAndroidResources
-
+import com.android.build.gradle.tasks.ProcessTestManifest
 import com.android.sdklib.BuildToolInfo
 import groovy.io.FileType
 import net.wequick.gradle.aapt.Aapt
 import net.wequick.gradle.aapt.SymbolParser
 import net.wequick.gradle.transform.StripAarTransform
-import net.wequick.gradle.util.AarPath
-import net.wequick.gradle.util.ClassFileUtils
-import net.wequick.gradle.util.JNIUtils
-import net.wequick.gradle.util.Log
-import net.wequick.gradle.util.ZipUtils
-import net.wequick.gradle.util.TaskUtils
+import net.wequick.gradle.util.*
 import org.gradle.api.Project
 import org.gradle.api.Task
 import org.gradle.api.artifacts.DependencySet
@@ -50,9 +44,11 @@ class AppPlugin extends BundlePlugin {
     private static final int UNSET_ENTRYID = -1
     protected static def sPackageIds = [:] as LinkedHashMap<String, Integer>
 
+    /** 插件依赖的lib插件工程 */
     protected Set<Project> mDependentLibProjects
     protected Set<Project> mTransitiveDependentLibProjects
     protected Set<Project> mProvidedProjects
+    /** 插件依赖的普遍工程 */
     protected Set<Project> mCompiledProjects
     protected Set<Map> mUserLibAars
     protected Set<File> mLibraryJars
@@ -98,6 +94,8 @@ class AppPlugin extends BundlePlugin {
         mProvidedProjects = []
         mCompiledProjects = []
         allLibs.each {
+	        Log.success "[${project.name}] check compilesDependencies($it.dependencyProject.name)"
+            // 区分lib库(公共库插件)和其他普通依赖库
             if (rootSmall.isLibProject(it.dependencyProject)) {
                 smallLibs.add(it)
                 mProvidedProjects.add(it.dependencyProject)
@@ -110,6 +108,7 @@ class AppPlugin extends BundlePlugin {
         collectAarsOfLibrary(project, mUserLibAars)
         mProvidedProjects.addAll(rootSmall.hostStubProjects)
 
+        // 编译lib公共插件时，移除对lib的依赖
         if (rootSmall.isBuildingLibs()) {
             // While building libs, `lib.*' modules are changing to be an application
             // module and cannot be depended by any other modules. To avoid warnings,
@@ -352,6 +351,7 @@ class AppPlugin extends BundlePlugin {
         def variantName = variant.name.capitalize()
         File mergerDir = variant.mergeResources.incrementalFolder
 
+        // 给small扩展赋值
         small.with {
             javac = variant.javaCompile
             processManifest = project.tasks["process${variantName}Manifest"]
@@ -367,10 +367,15 @@ class AppPlugin extends BundlePlugin {
             File symbolDir = aapt.textSymbolOutputDir
             File sourceDir = aapt.sourceOutputDir
 
+            // Aapt后生成的symbolFile，通过固定该文件，可以固定资源ID
             symbolFile = new File(symbolDir, 'R.txt')
+            // Application工程普通compile的R.java
             rJavaFile = new File(sourceDir, "${packagePath}/R.java")
 
+            // 待分离的R.java: 只有App自身的R.java: 未合成公共R前的App自身的R.java; 用于打包到插件自身包内;
+            // Q:  插件也可以引入单独的第三方组件, 这些aar的R，如何处理呢？
             splitRJavaFile = new File(sourceDir.parentFile, "small/${packagePath}/R.java")
+            Log.success "[${project.name}] rJavaFile: $rJavaFile ; split R.class : $splitRJavaFile ; exists-->" + splitRJavaFile.exists()
 
             mergerXml = new File(mergerDir, 'merger.xml')
         }
@@ -514,13 +519,16 @@ class AppPlugin extends BundlePlugin {
         }
     }
 
+    // 特别关键：保证public.txt内的ID，能够固定下来的机制
     /**
      * Prepare retained resource types and resource id maps for package slicing
      */
     protected void prepareSplit() {
+        // 判断本工程，是否有R文件，没有的话，直接退出；
         def idsFile = small.symbolFile
         if (!idsFile.exists()) return
 
+        // 收集所有Vendor.aar
         // Check if has any vendor aars
         def firstLevelVendorAars = [] as Set<ResolvedDependency>
         def transitiveVendorAars = [] as Set<Map>
@@ -551,13 +559,19 @@ class AppPlugin extends BundlePlugin {
             }
         }
 
+        // 添加所有普通compile的aar ： 目的仅仅是为了vendor types and styleables，使用！
         // Add user retained aars for generating their R.java, fix #194
         if (small.retainedAars != null) {
             transitiveVendorAars.addAll(small.retainedAars.collect {
                 [path: "$it.group/$it.name/$it.version", version: it.version]
             })
         }
+        Log.success "add transitiveVendorAars($transitiveVendorAars), publicSymbolFile($small.publicSymbolFile)"
 
+        // 从rootSmall.preIdsDir找到非本工程的所有lib库(公共插件)的R.txt文件; 这些资源均是需要过滤掉的
+        // 目的：生成staticIdMaps();
+        // Q: 依赖的lib库的R.txt，如何获取？
+        // A: buildLib时，生成到该目录的
         // Prepare id maps (bundle resource id -> library resource id)
         // Map to `lib.**` resources id first, and then the host one.
         def libEntries = [:]
@@ -569,20 +583,28 @@ class AppPlugin extends BundlePlugin {
             File libSymbol = new File(it.projectDir, 'public.txt')
             libEntries += SymbolParser.getResourceEntries(libSymbol)
         }
-
+        /** 工程自身的public.txt */
         def publicEntries = SymbolParser.getResourceEntries(small.publicSymbolFile)
+        /** 工程自身的R.txt：AAPT编译产物，基于他过滤出retianedEntries */
         def bundleEntries = SymbolParser.getResourceEntries(idsFile)
+        /** 所有修改的资源ID映射表：IdMaps<bundleId, libId> */
         def staticIdMaps = [:]
         def staticIdStrMaps = [:]
+        /** 工程需要保留的资源：中间产物，目的是生成retainedTypes这个最终产物 */
         def retainedEntries = []
+        /** 工程需要保留的public资源：对应工程自身的Public.txt */
         def retainedPublicEntries = []
         def retainedStyleables = []
         def reservedKeys = getReservedResourceKeys()
+        Log.success "reservedKeys($reservedKeys)"
 
         bundleEntries.each { k, Map be ->
             be._typeId = UNSET_TYPEID // for sort
             be._entryId = UNSET_ENTRYID
 
+            // 实现public固定资源ID: 用public.txt，替换R.txt; 以便后续重新javaC生成R.java
+            // Q: 为啥不替换PP段？ 固定的资源ID呀！
+            // A: 因为是bundle工程自身的资源，PP段，肯定就是bundle的packageId；所以，这里就不处理了？
             Map le = publicEntries.get(k)
             if (le != null) {
                 // Use last built id
@@ -593,11 +615,13 @@ class AppPlugin extends BundlePlugin {
                 return
             }
 
+            // 添加到保留资源列表
             if (reservedKeys.contains(k)) {
                 be.isStyleable ? retainedStyleables.add(be) : retainedEntries.add(be)
                 return
             }
 
+            // 记录所有在lib库的public.txt内的资源ID
             le = libEntries.get(k)
             if (le != null) {
                 // Add static id maps to host or library resources and map it later at
@@ -612,9 +636,13 @@ class AppPlugin extends BundlePlugin {
 //                throw new Exception(
 //                        "Missing library resource entry: \"$k\", try to cleanLib and buildLib.")
 //            }
+
+            // Q: 为什么最后还需要再添加呢？
             be.isStyleable ? retainedStyleables.add(be) : retainedEntries.add(be)
         }
 
+        // 保留所有已经被删除的public.txt资源: 前面已经过滤过，剩余的就是已经被bundle删除掉的.
+        // Q: 这种也需要保留么？
         // TODO: retain deleted public entries
         if (publicEntries.size() > 0) {
             throw new RuntimeException("No support deleting resources on lib.* now!\n" +
@@ -633,12 +661,14 @@ class AppPlugin extends BundlePlugin {
 //                retainedPublicEntries.add(e)
 //            }
         }
+
+        // 如果没有需要retained的资源，则直接退出
         if (retainedEntries.size() == 0 && retainedPublicEntries.size() == 0) {
             small.retainedTypes = [] // Doesn't have any resources
             return
         }
 
-        // Prepare public types
+        // Prepare public types : 准备Public.txt资源，为后续重新分配资源ID
         def publicTypes = [:]
         def maxPublicTypeId = 0
         def unusedTypeIds = [] as Queue
@@ -675,6 +705,8 @@ class AppPlugin extends BundlePlugin {
             a.typeId <=> b.typeId ?: a.entryId <=> b.entryId
         }
 
+        // 重新分配资源ID：因为public.txt内的资源会随机占用了资源ID段; 会与原始AAPT产物有冲突;
+        // 这一步会合并 etainedEntries += retainedPublicEntries
         // Reassign resource type id (_typeId) and entry id (_entryId)
         def lastEntryIds = [:]
         if (retainedEntries.size() > 0) {
@@ -723,13 +755,15 @@ class AppPlugin extends BundlePlugin {
             retainedEntries = retainedPublicEntries
         }
 
+        // 按照typeId -> entryId 顺序排列，以方便后续生成retainedTypes
         // Resort with reassigned resources order
         retainedEntries.sort { a, b ->
             a._typeId <=> b._typeId ?: a._entryId <=> b._entryId
         }
 
+        // 前面处理完所有资源Entries后，开始生成retainedTypes(这个是最终产物)
         // Resort retained resources
-        def retainedTypes = []
+        def retainedTypes = []  // List<Map<,,,,Map<>>>
         def pid = (small.packageId << 24)
         def currType = null
         retainedEntries.each { e ->
@@ -739,11 +773,13 @@ class AppPlugin extends BundlePlugin {
                 currType = [type: e.vtype, name: e.type, id: e.typeId, _id: e._typeId, entries: []]
                 retainedTypes.add(currType)
             }
+            // 记录所有IdMaps: 后续，修改XML资源ID时，需要用到
             def newResId = pid | (e._typeId << 16) | e._entryId
             def newResIdStr = "0x${Integer.toHexString(newResId)}"
-            staticIdMaps.put(e.id, newResId)
+            staticIdMaps.put(e.id, newResId)    // 前面已经处理过libEntries(肯定是public固定的), 这里处理剩余的工程自身的ID，因此需要在分配资源后再处理;
             staticIdStrMaps.put(e.idStr, newResIdStr)
 
+            // Q: 不懂
             // Prepare styleable id maps for resolving R.java
             if (retainedStyleables.size() > 0 && e.typeId == 1) {
                 retainedStyleables.findAll { it.idStrs != null }.each {
@@ -761,6 +797,7 @@ class AppPlugin extends BundlePlugin {
             currType.entries.add(entry)
         }
 
+        // Q: ����
         // Update the id array for styleables
         retainedStyleables.findAll { it.mapped != null }.each {
             it.idStr = "{ ${it.idStrs.join(', ')} }"
@@ -947,8 +984,12 @@ class AppPlugin extends BundlePlugin {
         small.allTypes = allTypes
         small.allStyleables = allStyleables
 
+        // 这一块，不太懂，用处是什么
         small.vendorTypes = vendorTypes
         small.vendorStyleables = vendorStyleables
+
+        Log.success "prepareSplit: retainedTypes(${small.retainedTypes}) \n        retainedStyleables($retainedStyleables) \n        " +
+                "vendorTypes($vendorTypes)"   //idMaps($staticIdStrMaps), 特别多值
     }
 
     protected int getABIFlag() {
@@ -996,6 +1037,8 @@ class AppPlugin extends BundlePlugin {
 
     protected void hookVariantTask(BaseVariant variant) {
         hookMergeAssets(variant.mergeAssets)
+
+//        hookRes(variant.mergeResources)
 
         hookProcessManifest(small.processManifest)
 
@@ -1056,6 +1099,7 @@ class AppPlugin extends BundlePlugin {
     private void hookMergeAssets(MergeSourceSetFolders t) {
         stripAarFiles(t, { paths ->
             t.inputDirectorySets.each {
+                // configName: 对于aar，就是版本号(23.2.1)；对于Module，一般都是(main, release)
                 if (it.configName == 'main' || it.configName == 'release') return
 
                 it.sourceFiles.each {
@@ -1087,8 +1131,10 @@ class AppPlugin extends BundlePlugin {
                 strips.add(org: it, backup: backup)
                 it.renameTo(backup)
             }
+            // 通过扩展的方式，添加成员变量，以便doLast时，能够恢复;
             it.extensions.add('strips', strips)
         }
+        // 以便doLast时，恢复ProvidedCompile的aar;
         t.doLast {
             Set<Map> strips = (Set<Map>) it.extensions.getByName('strips')
             strips.each {
@@ -1180,6 +1226,7 @@ class AppPlugin extends BundlePlugin {
     }
 
     private def hookProcessManifest(Task processManifest) {
+        // 去除所有ProvidedCompile的任务
         // If an app.A dependent by lib.B and both of them declare application@name in their
         // manifests, the `processManifest` task will raise an conflict error.
         // Cause the release mode doesn't need to merge the manifest of lib.*, simply split
@@ -1190,24 +1237,37 @@ class AppPlugin extends BundlePlugin {
             processManifest.doFirst { MergeManifests it ->
                 if (pluginType != PluginType.App) return
 
+            Log.header "[${project.name}] processManifest($processManifest.name) MergeManifestsTask($it.name) Task.project($it.project.name)"
+
+                // 遍历每一个Task的compile依赖，排除lib库
                 def libs = it.libraries
                 def smallLibs = []
                 libs.each {
                     def components = it.name.split(':') // e.g. 'Sample:lib.style:unspecified'
                     if (components.size() != 3) return
 
+                    // \build\intermediates\exploded-aar\
+                    // Q: 为啥没有com.android.support/下的Manifest文件呢？
+                    Log.success "[${project.name}] check MergeManifestsTask.libraries($it.name)"
+                    // 排除所有lib库的Manifest文件
                     def projectName = components[1]
                     if (!rootSmall.isLibProject(projectName)) return
 
                     smallLibs.add(it)
+
+                    Log.success "[${project.name}] split library Manifest files... $it.name, file($it.manifest.absolutePath)"
                 }
                 libs.removeAll(smallLibs)
                 it.libraries = libs
             }
         }
+
+        // 解决Manifest合并时的错误！
+        // Q: 上一步都去除了，这里为啥还会有报错！
         // Hook process-manifest task to remove the `android:icon' and `android:label' attribute
         // which declared in the plugin `AndroidManifest.xml' application node. (for #11)
         processManifest.doLast { MergeManifests it ->
+            // build\intermediates\manifests\full\
             File manifestFile = it.manifestOutputFile
             def sb = new StringBuilder()
             def enteredApplicationNode = false
@@ -1216,6 +1276,8 @@ class AppPlugin extends BundlePlugin {
                     'android:icon', 'android:label',
                     'android:allowBackup', 'android:supportsRtl'
             ]
+
+            Log.footer "[${project.name}] gen manifestOutputFile($manifestFile)"
 
             // We don't use XmlParser but simply parse each line cause this should be faster
             manifestFile.eachLine { line ->
@@ -1276,7 +1338,10 @@ class AppPlugin extends BundlePlugin {
      */
     private def hookAapt(ProcessAndroidResources aaptTask) {
         aaptTask.doLast { ProcessAndroidResources it ->
-            // Unpack resources.ap_
+            Log.header "[${project.name}] hookAapt aaptTask($aaptTask.name), ProcessAndroidResources($it.name): " +
+                    "packageOutputFile($it.packageOutputFile), textSymbolOutputDir($it.textSymbolOutputDir) "
+
+            // Unpack resources.ap_ : \build\intermediates\res\resources-release.ap_
             File apFile = it.packageOutputFile
             FileTree apFiles = project.zipTree(apFile)
             File unzipApDir = new File(apFile.parentFile, 'ap_unzip')
@@ -1290,10 +1355,18 @@ class AppPlugin extends BundlePlugin {
                 include 'res/**/*'
             }
 
-            // Modify assets
+            // Debug, bake apFile to compare two apFiles
+//            copyFile(apFile, apFile.getParent(), apFile.name + ".bak")
+            org.apache.commons.io.FileUtils.copyFile(apFile, new File(apFile.getParent(), apFile.name + ".bak"))
+
+            // Modify assets : 为啥最终生成的apFile，会比原始的多了一个assets呢？
             prepareSplit()
+
+            // 工程合成后的R.txt文件: 为啥业务插件，不传递R.txt, 不需要固定public.txt么？
+            // symbolFile: build\intermediates\symbols\release\R.txt
             File symbolFile = (small.type == PluginType.Library) ?
                     new File(it.textSymbolOutputDir, 'R.txt') : null
+            // 工程合成后的R.java文件
             File sourceOutputDir = it.sourceOutputDir
             File rJavaFile = new File(sourceOutputDir, "${small.packagePath}/R.java")
             def rev = android.buildToolsRevision
@@ -1313,25 +1386,40 @@ class AppPlugin extends BundlePlugin {
             }
 
             Aapt aapt = new Aapt(unzipApDir, rJavaFile, symbolFile, rev)
+            Log.success "[${project.name}] ReAapt symbolFile($symbolFile), rJavaFile($rJavaFile) unzipApDir($unzipApDir)"
+
             if (small.retainedTypes != null && small.retainedTypes.size() > 0) {
+                // 这两段难理解; 只能反推; 屏蔽调后，看看打包结果如何，对比就能看出来作用！
+                // 过滤res/目录：排除掉filteredResources资源
                 aapt.filterResources(small.retainedTypes, filteredResources)
                 Log.success "[${project.name}] split library res files..."
 
+                // 修改资源ID：处理resources.arsc文件、XML文件、R.txt
                 aapt.filterPackage(small.retainedTypes, small.packageId, small.idMaps, libRefTable,
                         small.retainedStyleables, updatedResources)
-
-                Log.success "[${project.name}] slice asset package and reset package id..."
+			
+                Log.success "[${project.name}] slice asset package and reset package id...${small.packageId}, updatedResources($updatedResources)"   //, idMaps($small.idMaps)
 
                 String pkg = small.packageName
-                // Overwrite the aapt-generated R.java with full edition
+
+                // 重新生成R.java: 固定publicID, 后续javac编译class文件时，会应用到该类；
+                // Overwrite the aapt-generated R.java with full edition: build\generated\source\r\release\net\wequick\example\small\app\mine\R.java
                 aapt.generateRJava(small.rJavaFile, pkg, small.allTypes, small.allStyleables)
+                Log.success "[${project.name}] generateRJava($small.rJavaFile)"
+
+                // 生成small.splitRJavaFile文件: 仅插件自身资源ID；
+                // 关键：该文件，最终打包到dex中！
+                // build\generated\source\r\small\net\wequick\example\small\app\mine\R.java
                 // Also generate a split edition for later re-compiling
                 aapt.generateRJava(small.splitRJavaFile, pkg,
                         small.retainedTypes, small.retainedStyleables)
+                Log.success "[${project.name}] generate split RJava($small.splitRJavaFile)"
 
+                // 场景：依赖的aar内，代码访问R.资源
                 // Overwrite the retained vendor R.java
                 def retainedRFiles = [small.rJavaFile]
                 small.vendorTypes.each { name, types ->
+                    // 找到aar包，解析出包名
                     File aarOutput = small.buildCaches.get(name)
                     // TODO: read the aar package name once and store
                     File manifestFile = new File(aarOutput, 'AndroidManifest.xml')
@@ -1343,6 +1431,7 @@ class AppPlugin extends BundlePlugin {
 
                     def styleables = small.vendorStyleables[name]
                     aapt.generateRJava(r, aarPkg, types, styleables)
+                    Log.success "[${project.name}] ----------Overwrite the retained vendor($name) R.java($r.path)"
                 }
 
                 // Remove unused R.java to fix the reference of shared library resource, issue #63
@@ -1354,6 +1443,7 @@ class AppPlugin extends BundlePlugin {
 
                 Log.success "[${project.name}] split library R.java files..."
             } else {
+                // 如果插件自身没有任何资源：则简单删除所有资源
                 noResourcesFlag = 1
                 if (aapt.deleteResourcesDir(filteredResources)) {
                     Log.success "[${project.name}] remove resources dir..."
@@ -1370,6 +1460,7 @@ class AppPlugin extends BundlePlugin {
                 small.symbolFile.delete() // also delete the generated R.txt
             }
 
+            // 完全不懂!
             int abiFlag = getABIFlag()
             int flags = (abiFlag << 1) | noResourcesFlag
             if (aapt.writeSmallFlags(flags, updatedResources)) {
@@ -1378,11 +1469,15 @@ class AppPlugin extends BundlePlugin {
 
             String aaptExe = small.aapt.buildTools.getPath(BuildToolInfo.PathId.AAPT)
 
+            // 更新AAPT结果：先删除，再重新添加；因为没有update命令；
+            //      添加文件，不涉及到编译过程，仅仅是更新压缩内的文件？  -- 所以，此时，清理资源是不会有影响的！
+            //      问题：为啥不是对unzip解压&过滤&修改过的文件，重新压缩下 即可？ 为啥要调用AAPT工具，重新对.ap_压缩包处理？
+            // 这一步更新*.ap_文件(包括assets/, res/, Manifest.xml, resource.arsc文件)
             // Delete filtered entries.
             // Cause there is no `aapt update' command supported, so for the updated resources
             // we also delete first and run `aapt add' later.
-            filteredResources.addAll(updatedResources)
-            ZipUtils.with(apFile).deleteAll(filteredResources)
+            filteredResources.addAll(updatedResources)  // 添加Resource.arsc文件，各种有依赖lib资源的XML文件，也需要重新更新
+            ZipUtils.with(apFile).deleteAll(filteredResources)      //Q: unzip解压包中，已经过滤掉了，为啥还需要再处理.ap_压缩包呢？
 
             // Re-add updated entries.
             // $ aapt add resources.ap_ file1 file2 ...
@@ -1430,7 +1525,9 @@ class AppPlugin extends BundlePlugin {
     }
 
     /**
-     * Hook javac task to split libraries' R.class
+     * Hook javac task to split libraries' R.class <br/>
+     * 重新编译个lib的R.class文件，以便能应用修改了的资源ID;
+     * 由于没有lib库没有静态内联优化，因此无需重新编译其他class文件！
      */
     private def hookJavac(Task javac, boolean minifyEnabled) {
         addClasspath(javac)
@@ -1445,6 +1542,7 @@ class AppPlugin extends BundlePlugin {
             dstDir.listFiles().each { f ->
                 if (f.name.startsWith('R$')) {
                     f.delete()
+//                    Log.success "[${project.name}] deleteFile($f)"
                 }
             }
             // Re-compile the split R.java to R.class
@@ -1453,7 +1551,8 @@ class AppPlugin extends BundlePlugin {
                     target: it.targetCompatibility,
                     destdir: classesDir)
 
-            Log.success "[${project.name}] split R.class..."
+            // form build\generated\source\r\small\net\wequick\example\small\app\mine\R.java to  build\intermediates\classes\release
+            Log.success "[${project.name}] Re-compile the split R.java($small.splitRJavaFile) to destdir($classesDir)"
         }
     }
 
@@ -1478,6 +1577,7 @@ class AppPlugin extends BundlePlugin {
     protected void collectReservedResourceKeys(config, path,
                                                Set<SymbolParser.Entry> outTypeEntries,
                                                Set<String> outStyleableKeys) {
+        // 解析mergerXml文件: 通过config过滤出需要的资源包；默认情况下，仅本工程的资源！
         def merger = new XmlParser().parse(small.mergerXml)
         def filter = config == null ? {
             it.@config == 'main' || it.@config == 'release'
@@ -1503,6 +1603,7 @@ class AppPlugin extends BundlePlugin {
                         return
                     }
 
+                    // 如果没有type字段：继续遍历，children.name 来判断类型
                     it.children().each {
                         type = it.name()
                         String name = it.@name
@@ -1536,6 +1637,8 @@ class AppPlugin extends BundlePlugin {
                 }
             }
         }
+
+//        Log.success "collectReservedResourceKeys: mergerXml($small.mergerXml), outTypeEntries($outTypeEntries), \n outStyleableKeys($outStyleableKeys)";
     }
 
     /**

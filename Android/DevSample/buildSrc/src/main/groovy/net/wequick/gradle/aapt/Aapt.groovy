@@ -52,12 +52,15 @@ public class Aapt {
         File arscFile = new File(mAssetDir, FILE_ARSC)
         def arscEditor = new ArscEditor(arscFile, mToolsRevision)
 
-        // Filter R.txt
+        // Filter R.txt : 比较简单，重新生成R.txt
         if (mSymbolFile != null) filterRtext(mSymbolFile, retainedTypes, retainedStyleables)
+
+        // 最复杂的实现逻辑：pulbic.xml + 能否不清除多余的依赖资源？
         // Filter resources.arsc
         arscEditor.slice(pp, idMaps, libRefTable, retainedTypes)
         outUpdatedResources.add(FILE_ARSC)
 
+        // reset xml pp: 递归遍历所有XML文件，修改引用到的资源ID、或者pp段
         resetAllXmlPackageId(mAssetDir, pp, idMaps, outUpdatedResources)
     }
 
@@ -134,14 +137,17 @@ public class Aapt {
     }
 
     /**
+     * 删除解压包中res/目录下的依赖资源 <br/>
      * Filter resources with specific types
-     * @param retainedTypes
+     * @param retainedTypes : 需要保留的资源列表(二级列表结构)
+     * @param outFilteredResources ：过滤掉的资源名称集合，Set<String>
      */
     void filterResources(List retainedTypes, Set outFilteredResources) {
         def resDir = new File(mAssetDir, 'res')
         resDir.listFiles().each { typeDir ->
+            // 遍历目录：匹配资源类型名
             def type = retainedTypes.find { typeDir.name.startsWith(it.name) }
-            if (type == null) {
+            if (type == null) { // 该类型不存在，全部过滤掉！
                 // Split whole type
                 typeDir.listFiles().each {
                     outFilteredResources.add("res/$typeDir.name/$it.name" as String)
@@ -187,8 +193,8 @@ public class Aapt {
         dir.eachFileRecurse(FileType.FILES) { file ->
             if (file.name.endsWith('.xml')) {
                 def editor = new AXmlEditor(file)
-                editor.setPackageId(pp, idMaps)
-                if (outUpdatedResources != null) {
+                editor.setPackageId(pp, idMaps) // 这个可以有返回值的，通过判断返回值的方法，可以区分哪些不需要修改资源ID的XML文件；
+                if (outUpdatedResources != null) {  // 所有XML均需要替换资源引用么？
                     def path = file.canonicalPath.substring(len)
                     if (isWindows) { // compat for windows
                         path = path.replaceAll('\\\\', ENTRY_SEPARATOR)

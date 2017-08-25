@@ -6,6 +6,7 @@ import com.android.build.gradle.internal.pipeline.IntermediateFolderUtils
 import com.android.build.gradle.internal.pipeline.TransformTask
 import com.android.build.gradle.internal.transforms.ProGuardTransform
 import net.wequick.gradle.tasks.CleanBundleTask
+import net.wequick.gradle.util.Log
 import org.apache.commons.io.FileUtils
 import org.gradle.api.Project
 
@@ -129,6 +130,8 @@ class LibraryPlugin extends AppPlugin {
         small.jar = project.jarReleaseClasses
 
         variant.assemble.doLast {
+            // 作用是什么？
+            // 后续其他插件需要依赖lib插件jar包？
             // Generate jar file to root pre-jar directory
             // FIXME: Create a task for this
             def jarName = getJarName(project)
@@ -137,6 +140,7 @@ class LibraryPlugin extends AppPlugin {
                 FileUtils.copyFile(mMinifyJar, jarFile)
             } else {
                 project.ant.jar(baseDir: small.javac.destinationDir, destFile: jarFile)
+//                Log.success "jar dir($small.javac.destinationDir) to destFile($jarFile)"
             }
 
             // Backup R.txt to public.txt
@@ -145,6 +149,7 @@ class LibraryPlugin extends AppPlugin {
 
             def publicIdsPw = new PrintWriter(small.publicSymbolFile.newWriter(false))
             small.symbolFile.eachLine { s ->
+                // 为啥排除掉styleable呢？
                 if (!s.contains("styleable")) {
                     publicIdsPw.println(s)
                 }

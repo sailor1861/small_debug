@@ -60,14 +60,17 @@ public class StripAarTransform extends Transform {
         Project project = ((Task) context).project
         AppExtension small = project.small
         inputs.each {
-            // Bypass the directories
+            // Bypass the directories : 工程自身的class文件
             it.directoryInputs.each {
                 File dest = outputProvider.getContentLocation(
                         it.name, it.contentTypes, it.scopes, Format.DIRECTORY);
                 FileUtils.copyDirectory(it.file, dest)
+
+                // from build\intermediates\classes\release  to  build\intermediates\transforms\smallStripped\release\folders\1\1\6\ca52260a6ed6c26f52b0482c2779b4ceba2c313
+//                BasePlugin.Log.success "[${project.name}] Bypass the directories(from $it.file to $dest)"
             }
 
-            // Filter the jars
+            // Filter the jars：过滤掉所有lib插件的依赖，保留普通compile的依赖
             it.jarInputs.each {
                 // Strip jars in aar or build-cache under android plugin 2.3.0+
                 File src = it.file
@@ -85,6 +88,8 @@ public class StripAarTransform extends Transform {
                 File dest = outputProvider.getContentLocation(
                         destName, it.contentTypes, it.scopes, Format.JAR)
                 FileUtils.copyFile(it.file, dest)
+                // from build\intermediates\exploded-aar\DevSample\jni_plugin\xxx\jars\classes.jar  to  build\intermediates\transforms\smallStripped\release\jars\1\4\jni_plugin-unspecified.jar
+//                BasePlugin.Log.success "[${project.name}] copyFile($it.file, $dest)"
             }
         }
     }
