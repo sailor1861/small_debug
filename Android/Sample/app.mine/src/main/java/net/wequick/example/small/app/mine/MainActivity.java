@@ -4,6 +4,7 @@ import android.app.Activity;
 import android.os.Bundle;
 import android.support.annotation.Nullable;
 
+import static net.wequick.example.small.app.mine.MainFragment.testLibPlugin;
 /**
  * Created by galen on 15/11/11.
  */
@@ -13,5 +14,6 @@ public class MainActivity extends Activity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
+        testLibPlugin();
     }
 }
