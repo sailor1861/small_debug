@@ -124,6 +124,7 @@ class RootPlugin extends BasePlugin {
                 }
 
                 if (it.hasProperty('buildLib')) {
+                    Log.success "project($it.project) hasProperty buildLib"
                     it.small.buildIndex = ++rootExt.libCount
                     it.tasks['buildLib'].doLast {
                         buildLib(it.project)
@@ -138,6 +139,7 @@ class RootPlugin extends BasePlugin {
                         "Cannot find host module with name: '${rootExt.hostModuleName}'!")
             }
 
+            // 自动添加hostStub库依赖：Host和所有插件，均可以依赖hostStub库
             if (!rootExt.hostStubProjects.empty) {
                 rootExt.hostStubProjects.each { stub ->
                     rootExt.hostProject.afterEvaluate {
@@ -157,9 +159,12 @@ class RootPlugin extends BasePlugin {
                     stub.task('cleanLib', type: CleanBundleTask)
                 }
             }
+
+            Log.footer "$project.name afterEvaluate: host($rootExt.hostProject) stub($rootExt.hostStubProjects)"
         }
 
         compatVendors()
+
     }
 
     protected void configVersions(Project p, RootExtension.AndroidConfig base) {
@@ -411,6 +416,7 @@ class RootPlugin extends BasePlugin {
     void buildLib(Project lib) {
         def libName = lib.name
         def ext = (AndroidExtension) lib.small
+        Log.header "Project($libName) buildLib.doLast: "
 
         // Copy jars
         def preJarDir = small.preBaseJarDir
@@ -423,6 +429,7 @@ class RootPlugin extends BasePlugin {
                 into preJarDir
                 rename {"$libName-r.jar"}
             }
+            Log.success "copy($rJar) to($preJarDir $libName-r.jar)"
         }
         //  - copy dependencies jars
         ext.buildCaches.each { k, v ->
@@ -444,6 +451,7 @@ class RootPlugin extends BasePlugin {
                 into preJarDir
                 rename {destFile.name}
             }
+            Log.success "copy($jarFile) to($preJarDir $destFile.name)"
 
             // Check if exists `jars/libs/*.jar' and copy
             File libDir = new File(jarDir, 'libs')
@@ -458,10 +466,12 @@ class RootPlugin extends BasePlugin {
                     into preJarDir
                     rename {destFile.name}
                 }
+                Log.success "copy($jar) to($preJarDir $destFile.name)"
             }
         }
 
         // Copy *.ap_
+        // 作用是？
         def aapt = ext.aapt
         def preApDir = small.preApDir
         if (!preApDir.exists()) preApDir.mkdir()
@@ -473,7 +483,9 @@ class RootPlugin extends BasePlugin {
             rename {preApName}
         }
 
-        // Copy R.txt : ���Ƹ�lib���̵�R�ļ�����������preIdsDirĿ¼������lib���̱���һ��󣬸�Ŀ¼����������Ҫ��R�ļ��ˣ�
+        // Copy R.txt : 复制该lib工程的R文件，到公共的preIdsDir目录；所有lib工程编译一遍后，该目录下有所有需要的R文件了！
+        // 作用：所有需要固定的资源ID，均缓存到这里
+        // 直接copy textSymbolOutputDir 不可以么？ 为啥还需要读写呢？
         def preIdsDir = small.preIdsDir
         if (!preIdsDir.exists()) preIdsDir.mkdir()
         def srcIdsFile = new File(aapt.textSymbolOutputDir, 'R.txt')
@@ -502,6 +514,7 @@ class RootPlugin extends BasePlugin {
             keysPw.close()
         }
 
+        // D.txt：host +　每一个lib的依赖
         // Backup dependencies
         if (!small.preLinkAarDir.exists()) small.preLinkAarDir.mkdirs()
         if (!small.preLinkJarDir.exists()) small.preLinkJarDir.mkdirs()

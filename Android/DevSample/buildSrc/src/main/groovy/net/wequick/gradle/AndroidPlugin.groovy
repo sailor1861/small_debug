@@ -79,6 +79,7 @@ class AndroidPlugin extends BasePlugin {
     protected void beforeEvaluate(boolean released) { }
 
     protected void afterEvaluate(boolean released) {
+        // 添加公共依赖
         // Automatic add `small' dependency
         if (rootSmall.smallProject != null) {
             project.dependencies.add(smallCompileType, rootSmall.smallProject)
@@ -86,6 +87,7 @@ class AndroidPlugin extends BasePlugin {
             project.dependencies.add(smallCompileType, "${SMALL_AAR_PREFIX}$rootSmall.aarVersion")
         }
 
+        // 拦截任务
         def preBuild = project.tasks['preBuild']
         if (released) {
             preBuild.doFirst {
@@ -103,6 +105,7 @@ class AndroidPlugin extends BasePlugin {
         }
     }
 
+    // 移除占位的四大组件：忽略
     /**
      * Remove unimplemented content providers in the bundle manifest.
      *
@@ -217,6 +220,7 @@ class AndroidPlugin extends BasePlugin {
         // Init default output file (*.apk)
         small.outputFile = variant.outputs[0].outputFile
 
+        // 收集工程依赖
         small.buildCaches = new HashMap<String, File>()
         project.tasks.withType(PrepareLibraryTask.class).each {
             TaskUtils.collectAarBuildCacheDir(it, small.buildCaches)

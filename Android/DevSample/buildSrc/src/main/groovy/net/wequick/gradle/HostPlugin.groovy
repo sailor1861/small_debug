@@ -15,6 +15,7 @@ class HostPlugin extends AndroidPlugin {
         super.configureProject()
         
         project.afterEvaluate {
+            // 定义所有插件so文件的存放位置：
             // Configure libs dir
             def sourceSet = project.android.sourceSets.main
             def source = rootSmall.buildToAssets ? sourceSet.assets : sourceSet.jniLibs
