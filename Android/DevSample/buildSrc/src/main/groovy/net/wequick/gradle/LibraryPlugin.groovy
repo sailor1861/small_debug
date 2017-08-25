@@ -1,8 +1,6 @@
 package net.wequick.gradle
 
-import com.android.build.api.transform.Format
 import com.android.build.gradle.api.BaseVariant
-import com.android.build.gradle.internal.pipeline.IntermediateFolderUtils
 import com.android.build.gradle.internal.pipeline.TransformTask
 import com.android.build.gradle.internal.transforms.ProGuardTransform
 import org.apache.commons.io.FileUtils
@@ -74,6 +72,8 @@ class LibraryPlugin extends AppPlugin {
             project.buildFile.renameTo(mBakBuildFile)
             project.buildFile.write(text)
         }
+
+        // Q: why?
         project.afterEvaluate {
             // Set application id
             def manifest = new XmlParser().parse(android.sourceSets.main.manifestFile)
@@ -93,6 +93,7 @@ class LibraryPlugin extends AppPlugin {
 
         if (mT != 'buildLib') return
 
+        // 解决公共插件间的依赖
         // Add library dependencies for `buildLib', fix issue #65
         project.afterEvaluate {
             if (isBuildingRelease()) {
@@ -119,6 +120,8 @@ class LibraryPlugin extends AppPlugin {
         small.jar = project.jarReleaseClasses
 
         variant.assemble.doLast {
+            // 作用是什么？
+            // 后续其他插件需要依赖lib插件jar包？
             // Generate jar file to root pre-jar directory
             // FIXME: Create a task for this
             def jarName = getJarName(project)
@@ -127,14 +130,17 @@ class LibraryPlugin extends AppPlugin {
                 FileUtils.copyFile(mMinifyJar, jarFile)
             } else {
                 project.ant.jar(baseDir: small.javac.destinationDir, destFile: jarFile)
+                Log.footer "jar dir($small.javac.destinationDir) to destFile($jarFile)"
             }
 
             // Backup R.txt to public.txt
             // FIXME: Create a task for this
             if (!small.symbolFile.exists())  return
 
+            // 调试public.xml用，暂时屏蔽
             def publicIdsPw = new PrintWriter(small.publicSymbolFile.newWriter(false))
             small.symbolFile.eachLine { s ->
+                // 为啥排除掉styleable呢？
                 if (!s.contains("styleable")) {
                     publicIdsPw.println(s)
                 }

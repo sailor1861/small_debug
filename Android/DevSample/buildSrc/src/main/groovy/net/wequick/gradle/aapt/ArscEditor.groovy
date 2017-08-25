@@ -39,7 +39,7 @@ public class ArscEditor extends AssetEditor {
      *  +-----------------------+
      */
 
-    private static final boolean DEBUG_NOISY = false // log verbose
+    private static final boolean DEBUG_NOISY = false // log verbose: false
 
     private static def LIBRARY_HEADER_SIZE = 0x0C
     private static def LIBRARY_ENTRY_SIZE = 260 // packageId(4), packageName(256)

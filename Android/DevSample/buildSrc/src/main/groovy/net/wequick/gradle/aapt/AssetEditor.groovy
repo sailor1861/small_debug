@@ -77,8 +77,8 @@ public class AssetEditor extends CppHexEditor {
     protected def checkToRewritePackageId(int pp, Map idMaps) {
         def pos = tellp()
         int id = readInt()
-        if (id >> 24 != 0x7f) return
-        if (idMaps != null && idMaps.containsKey(id)) {
+        if (id >> 24 != 0x7f) return    // 非0x7f的资源，无需替换；包括：系统资源(0x01)
+        if (idMaps != null && idMaps.containsKey(id)) { // 所有public资源，均需要加入idMaps中！ host共享库的资源也需要加入
             id = idMaps.get(id) // use library resource id
         } else {
             id = ((pp << 24) | (id & 0x00ffffff)) // replace pp

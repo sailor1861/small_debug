@@ -190,8 +190,8 @@ public class Aapt {
         dir.eachFileRecurse(FileType.FILES) { file ->
             if (file.name.endsWith('.xml')) {
                 def editor = new AXmlEditor(file)
-                editor.setPackageId(pp, idMaps)
-                if (outUpdatedResources != null) {
+                editor.setPackageId(pp, idMaps) // 这个可以有返回值的，通过判断返回值的方法，可以区分哪些不需要修改资源ID的XML文件；
+                if (outUpdatedResources != null) {  // 所有XML均需要替换资源引用么？
                     outUpdatedResources.add(file.canonicalPath.substring(len))
                 }
             }

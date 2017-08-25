@@ -15,6 +15,8 @@
  */
 package com.example.hellojni;
 
+import android.util.Log;
+
 public final class HelloPluginJni
 {
     /* A native method that is implemented by the
@@ -25,5 +27,11 @@ public final class HelloPluginJni
 
     static {
         System.loadLibrary("hello-plugin-jni");
+    }
+
+    public void testAarRes() {
+        Log.i("HelloPluginJni", "MyTextView  android.R " + Integer.toHexString(android.R.style.Theme_Holo_Light_NoActionBar) +
+                " android.support.v7.appcompat.R" + Integer.toHexString(android.support.v7.appcompat.R.style.Theme_AppCompat_Light_NoActionBar) +
+                " bundle.aar.R.bool.aar_test_bool " + R.bool.aar_test_bool + " bundle.aar.R.bool.aar_test_string " + R.string.aar_test_string);
     }
 }

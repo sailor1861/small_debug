@@ -464,7 +464,7 @@ class AppPlugin extends BundlePlugin {
         // A: buildLib时，生成到该目录的
         // Prepare id maps (bundle resource id -> library resource id)
         def libEntries = [:]
-        rootSmall.preIdsDir.listFiles().each {
+        rootSmall.preIdsDir.listFiles().each {  // todo: host共享库的资源也需要加入到这里！ host编译后，也是讲pulbic.txt copy到 rootSmall.preIdsDir
             if (it.name.endsWith('R.txt') && !it.name.startsWith(project.name)) {
                 libEntries += SymbolParser.getResourceEntries(it)
             }
@@ -790,7 +790,8 @@ class AppPlugin extends BundlePlugin {
         small.vendorTypes = vendorTypes
         small.vendorStyleables = vendorStyleables
 
-        Log.success "retainedStyleables($retainedStyleables), vendorTypes($vendorTypes)"   //idMaps($staticIdStrMaps), 特别多的值！
+        Log.success "prepareSplit: retainedTypes(${small.retainedTypes}) \n        retainedStyleables($retainedStyleables) \n        " +
+                "vendorTypes($vendorTypes)"   //idMaps($staticIdStrMaps), 特别多的值！
     }
 
     protected int getABIFlag() {
@@ -1163,7 +1164,7 @@ class AppPlugin extends BundlePlugin {
                 // 这两段难理解; 只能反推; 屏蔽调后，看看打包结果如何，对比就能看出来作用！
                 // 过滤res/目录：排除掉filteredResources资源
                 aapt.filterResources(small.retainedTypes, filteredResources)
-                Log.success "[${project.name}] split library res files... retainedTypes(${small.retainedTypes})" //${small.retainedTypes} , 打印太多， 先屏蔽
+                Log.success "[${project.name}] split library res files..."
 
                 // 修改资源ID：处理resources.arsc文件、XML文件、R.txt
                 aapt.filterPackage(small.retainedTypes, small.packageId, small.idMaps,
@@ -1185,9 +1186,11 @@ class AppPlugin extends BundlePlugin {
                         small.retainedTypes, small.retainedStyleables)
                 Log.success "[${project.name}] generate split RJava($small.splitRJavaFile)"
 
+                // 场景：依赖的aar内，代码访问R.资源
                 // Overwrite the retained vendor R.java
                 def retainedRFiles = [small.rJavaFile]
                 small.vendorTypes.each { name, types ->
+                    // 找到aar包，解析出包名
                     File aarDir = new File(small.aarDir, name)
                     File manifestFile = new File(aarDir, 'AndroidManifest.xml')
                     def manifest = new XmlParser().parse(manifestFile)
@@ -1198,7 +1201,7 @@ class AppPlugin extends BundlePlugin {
 
                     def styleables = small.vendorStyleables[name]
                     aapt.generateRJava(r, aarPkg, types, styleables)
-                    Log.success "[${project.name}] ----what？------Overwrite the retained vendor($name) R.java($r.name)"
+                    Log.success "[${project.name}] ----------Overwrite the retained vendor($name) R.java($r.path)"
                 }
 
                 // Remove unused R.java to fix the reference of shared library resource, issue #63
@@ -1384,7 +1387,7 @@ class AppPlugin extends BundlePlugin {
             }
         }
 
-        Log.success "collectReservedResourceKeys(), mergerXml($small.mergerXml), outTypeEntries($outTypeEntries), outStyleableKeys($outStyleableKeys)"
+//        Log.success "collectReservedResourceKeys: mergerXml($small.mergerXml), outTypeEntries($outTypeEntries), \n outStyleableKeys($outStyleableKeys)";
     }
 
     /**
