@@ -16,7 +16,7 @@
         android:text="@string/span"
         android:layout_below="@id/section_label" />
 	
-    <!-- TestCase£ºApp²å¼þ·ÃÎÊlib²å¼þ -->
+    <!-- TestCaseï¼šAppæ’ä»¶è®¿é—®libæ’ä»¶èµ„æº -->
     <net.wequick.example.small.lib.utils.MyTextView
         android:id="@+id/my_label"
         android:layout_width="wrap_content"
