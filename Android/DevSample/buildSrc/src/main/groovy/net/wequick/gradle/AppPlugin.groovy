@@ -51,6 +51,7 @@ class AppPlugin extends BundlePlugin {
     /** 插件依赖的普遍工程 */
     protected Set<Project> mCompiledProjects
     protected Set<Map> mUserLibAars
+    /** 插件所有Provided依赖：只编译，不打包的依赖 */
     protected Set<File> mLibraryJars
     protected File mMinifyJar
 
@@ -94,7 +95,7 @@ class AppPlugin extends BundlePlugin {
         mProvidedProjects = []
         mCompiledProjects = []
         allLibs.each {
-	        Log.success "[${project.name}] check compilesDependencies($it.dependencyProject.name)"
+//	        Log.success "[${project.name}] afterEvaluate：check compilesDependencies($it.dependencyProject.name)"
             // 区分lib库(公共库插件)和其他普通依赖库
             if (rootSmall.isLibProject(it.dependencyProject)) {
                 smallLibs.add(it)
@@ -134,6 +135,10 @@ class AppPlugin extends BundlePlugin {
         return project.fileTree(dir: 'libs', include: '*.jar').asList()
     }
 
+    /**
+     * 获取插件Provided jars
+     * @return
+     */
     protected Set<File> getLibraryJars() {
         if (mLibraryJars != null) return mLibraryJars
 
@@ -182,6 +187,24 @@ class AppPlugin extends BundlePlugin {
             }
         }
 
+        /*
+        宿主app:
+                D:\code\Small\Android\DevSample\build-small\intermediates\small-pre-jar\base\app-r.jar,
+        app+stub：
+                D:\code\Small\Android\Sample\app+stub\build\intermediates\bundles\default\libs\assets.jar
+                D:\code\Small\Android\DevSample\build-small\intermediates\small-pre-jar\libs\app+stub-unspecified.jar,
+                D:\code\Small\Android\Sample\app+stub\libs\assets.jar,
+                D:\code\Small\Android\Sample\app+stub\build\intermediates\bundles\default\classes.jar,
+                D:\code\Small\Android\Sample\app+stub\build\intermediates\bundles\default\libs\assets.jar
+        support包：
+                D:\code\Small\Android\DevSample\build-small\intermediates\small-pre-jar\base\com.android.support-animated-vector-drawable-25.1.0.jar,
+
+        todo：
+             AH方案下， 插件已经通过Provied 依赖了fatJar包，是否可以省略宿主的jars, support前期也不支持;
+             不过，更好的方式， 还是通过插件这里，实现自定Provided注入，更方便一键集成！
+             此外，公共插件的jars, 还是需要通过这种方式注入的！
+        */
+        Log.footer "project[$project] getLibraryJars$mLibraryJars)"
         return mLibraryJars
     }
 
@@ -797,7 +820,7 @@ class AppPlugin extends BundlePlugin {
             currType.entries.add(entry)
         }
 
-        // Q: ����
+        // Q: 不懂
         // Update the id array for styleables
         retainedStyleables.findAll { it.mapped != null }.each {
             it.idStr = "{ ${it.idStrs.join(', ')} }"

@@ -220,7 +220,7 @@ class AndroidPlugin extends BasePlugin {
         // Init default output file (*.apk)
         small.outputFile = variant.outputs[0].outputFile
 
-        // 收集工程依赖
+        // 收集工程依赖：非常关键的实现
         small.buildCaches = new HashMap<String, File>()
         project.tasks.withType(PrepareLibraryTask.class).each {
             TaskUtils.collectAarBuildCacheDir(it, small.buildCaches)

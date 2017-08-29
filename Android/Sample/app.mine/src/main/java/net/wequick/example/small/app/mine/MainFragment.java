@@ -126,7 +126,7 @@ public class MainFragment extends Fragment {
      */
     public static void testLibPlugin() {
         // Java代码直接访问插件的资源
-        Log.i("app.mine", "testLibPlugin, resId: " + Integer.toHexString(R.bool.my_test_bool) + " " +
+        Log.w("app.mine", "testLibPlugin, resId: " + Integer.toHexString(R.bool.my_test_bool) + " " +
                 Integer.toHexString(R.color.my_test_color1) + " " +
                 Integer.toHexString(R.color.my_test_color2) + " " +
                 Integer.toHexString(R.mipmap.add));
@@ -135,9 +135,9 @@ public class MainFragment extends Fragment {
 //                net.wequick.example.small.lib.utils.R.array.my_test_colors + " " +
 //                net.wequick.example.small.lib.utils.R.mipmap.add);
 
-        Log.i("", "MyTextView  android.R " + Integer.toHexString(android.R.style.Theme_Holo_Light_NoActionBar) +
-                " android.support.v7.appcompat.R" + Integer.toHexString(android.support.v7.appcompat.R.style.Theme_AppCompat_Light_NoActionBar) +
-                " bundle.aar.R.bool.aar_test_bool " + R.bool.aar_test_bool + " bundle.aar.R.bool.aar_test_string " + R.string.aar_test_string);
+        Log.w("yedr", " android.R " + Integer.toHexString(android.R.style.Theme_Holo_Light_NoActionBar) +
+                " android.support.v7.appcompat.R" + Integer.toHexString(android.support.v7.appcompat.R.style.Theme_AppCompat_Light_NoActionBar)/* +
+                " bundle.aar.R.bool.aar_test_bool " + R.bool.aar_test_bool + " bundle.aar.R.bool.aar_test_string " + R.string.aar_test_string*/);
     }
 
 

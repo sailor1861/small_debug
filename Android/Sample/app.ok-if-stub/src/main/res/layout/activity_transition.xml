@@ -15,4 +15,8 @@
         android:layout_height="wrap_content"
         android:text="@string/hello_transition"/>
 
+    <!-- TestCase: APP插件访问stub资源 -->
+    <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="20dp"
+        android:id="@+id/test_stub_string_res" android:layout_below="@id/hello_transition_label"
+        android:text="@string/stub_new"/>
 </RelativeLayout>

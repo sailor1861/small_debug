@@ -52,6 +52,8 @@ class HostPlugin extends AndroidPlugin {
     protected void createTask() {
         super.createTask()
 
+        // Host工程：也支持buildLib任务，以支持app+stub模块
+        // 因为统一在buildLib.doLast时，执行jar、R.txt的备份，以实现代码&资源共享
         project.task('cleanLib', type: CleanBundleTask)
         project.task('buildLib')
     }

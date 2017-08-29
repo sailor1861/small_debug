@@ -54,6 +54,7 @@ class RootPlugin extends BasePlugin {
                     userBundleTypes.put(it, type)
                 }
             }
+            Log.header "project[$project] userBundleTypes($userBundleTypes)"
 
             // Configure versions
             def base = rootExt.android
@@ -81,6 +82,7 @@ class RootPlugin extends BasePlugin {
                     rootExt.hostStubProjects.add(it)
                     return
                 } else {
+                    // Small规范：通过工程名称，获取插件类型
                     String type = userBundleTypes.get(it.name)
                     if (type == null) {
                         def idx = it.name.indexOf('.')
@@ -123,6 +125,7 @@ class RootPlugin extends BasePlugin {
                     modules.add(it.name)
                 }
 
+                // 配置buildLib.doLast，编译插件后的后处理任务
                 if (it.hasProperty('buildLib')) {
                     Log.success "project($it.project) hasProperty buildLib"
                     it.small.buildIndex = ++rootExt.libCount
@@ -419,6 +422,7 @@ class RootPlugin extends BasePlugin {
         Log.header "Project($libName) buildLib.doLast: "
 
         // Copy jars
+        // 作用：AppPlugin.mLibraryJars 需要访问这些jars，以支持编译通过！
         def preJarDir = small.preBaseJarDir
         if (!preJarDir.exists()) preJarDir.mkdirs()
         //  - copy package.R jar
@@ -430,7 +434,7 @@ class RootPlugin extends BasePlugin {
                 rename {"$libName-r.jar"}
             }
             // \build\intermediates\packaged\release\classes.jar to DevSample\build-small\intermediates\small-pre-jar\base lib.utils-r.jar
-            Log.success "copy($rJar) to($preJarDir $libName-r.jar)"
+            Log.success "project[$libName] Copy jars: copy($rJar) to($preJarDir $libName-r.jar)"
         }
         //  - copy dependencies jars
         ext.buildCaches.each { k, v ->
@@ -452,7 +456,7 @@ class RootPlugin extends BasePlugin {
                 into preJarDir
                 rename {destFile.name}
             }
-            Log.success "copy($jarFile) to($preJarDir $destFile.name)"
+            Log.success "project[$libName] Copy dependencies jars: copy($jarFile) to($preJarDir $destFile.name)"
 
             // Check if exists `jars/libs/*.jar' and copy
             File libDir = new File(jarDir, 'libs')
@@ -467,12 +471,12 @@ class RootPlugin extends BasePlugin {
                     into preJarDir
                     rename {destFile.name}
                 }
-                Log.success "copy($jar) to($preJarDir $destFile.name)"
+                Log.success "project[$libName] Copy jars/libs/*.jar: copy($jar) to($preJarDir $destFile.name)"
             }
         }
 
         // Copy *.ap_
-        // 作用是？
+        // 作用是？  --没有发现有访问处？
         def aapt = ext.aapt
         def preApDir = small.preApDir
         if (!preApDir.exists()) preApDir.mkdir()
@@ -485,7 +489,7 @@ class RootPlugin extends BasePlugin {
         }
 
         // Copy R.txt : 复制该lib工程的R文件，到公共的preIdsDir目录；所有lib工程编译一遍后，该目录下有所有需要的R文件了！
-        // 作用：所有需要固定的资源ID，均缓存到这里
+        // 作用：所有需要固定的资源ID，均缓存到这里; 后续需要固定资源ID时，就从这里查询！
         // 直接copy textSymbolOutputDir 不可以么？ 为啥还需要读写呢？
         def preIdsDir = small.preIdsDir
         if (!preIdsDir.exists()) preIdsDir.mkdir()
@@ -513,9 +517,12 @@ class RootPlugin extends BasePlugin {
             idsPw.close()
             keysPw.flush()
             keysPw.close()
+
+            Log.success "project[$libName] copy SymbolTextFile: copy($srcIdsFile.path) to keysFile($keysFile)"
         }
 
-        // D.txt：host +　每一个lib的依赖
+        // D.txt：host +　每一个lib的依赖；
+        // 作用：small.splitAars 内需要记录所有依赖的aar、jar, 就是从这里获取数据的！
         // Backup dependencies
         if (!small.preLinkAarDir.exists()) small.preLinkAarDir.mkdirs()
         if (!small.preLinkJarDir.exists()) small.preLinkJarDir.mkdirs()

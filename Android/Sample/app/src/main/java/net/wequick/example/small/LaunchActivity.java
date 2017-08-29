@@ -3,6 +3,7 @@ package net.wequick.example.small;
 import android.app.Activity;
 import android.content.SharedPreferences;
 import android.os.Bundle;
+import android.util.Log;
 import android.view.Window;
 
 import net.wequick.small.Small;
@@ -19,6 +20,7 @@ public class LaunchActivity extends Activity {
     protected void onCreate(Bundle savedInstanceState) {
         requestWindowFeature(Window.FEATURE_NO_TITLE);
         super.onCreate(savedInstanceState);
+        testStubRes();
     }
 
     @Override
@@ -50,5 +52,10 @@ public class LaunchActivity extends Activity {
                 }
             }
         });
+    }
+
+
+    private void testStubRes() {
+        Log.w("yedr", "[Host] testStubRes(): R.string.stub_abc " + /*Integer.toHexString(R.string.stub_abc) +*/ "; R.string.stub_new " + Integer.toHexString(R.string.stub_new));
     }
 }

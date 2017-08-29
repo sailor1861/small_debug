@@ -15,6 +15,7 @@
  */
 package net.wequick.gradle
 
+import net.wequick.gradle.util.Log
 import org.gradle.api.Project
 import org.gradle.util.VersionNumber
 
@@ -161,6 +162,8 @@ public class RootExtension extends BaseExtension {
             mP = pn
             mT = t
         }
+
+        Log.header "project($project) mP($mP), mT($mT)"
     }
 
     public File getPreBuildDir() {
