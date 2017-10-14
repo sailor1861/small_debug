@@ -126,6 +126,7 @@ class RootPlugin extends BasePlugin {
                 }
 
                 // 配置buildLib.doLast，编译插件后的后处理任务
+                // todo: hostPlugin，libPlugin内实现是否均可以呢？
                 if (it.hasProperty('buildLib')) {
                     Log.success "project($it.project) hasProperty buildLib"
                     it.small.buildIndex = ++rootExt.libCount
