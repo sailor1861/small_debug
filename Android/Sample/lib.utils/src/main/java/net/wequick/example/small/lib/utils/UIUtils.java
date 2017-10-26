@@ -6,6 +6,8 @@ import android.content.Context;
 import android.util.Log;
 import android.widget.Toast;
 
+import net.wequick.example.appstub.StubCustom;
+
 /**
  * Created by galen on 15/12/14.
  */
@@ -27,5 +29,8 @@ public class UIUtils {
                 })
                 .create();
         dlg.show();
+
+        // TestCase：公共插件，访问app+stub共享库的代码
+        new StubCustom().log(tips);
     }
 }
