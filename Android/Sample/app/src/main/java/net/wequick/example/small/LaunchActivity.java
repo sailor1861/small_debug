@@ -6,6 +6,7 @@ import android.os.Bundle;
 import android.util.Log;
 import android.view.Window;
 
+import net.wequick.example.appstub.StubCustom;
 import net.wequick.small.Small;
 
 /**
@@ -56,6 +57,7 @@ public class LaunchActivity extends Activity {
 
 
     private void testStubRes() {
+        new StubCustom();
         Log.w("yedr", "[Host] testStubRes(): R.string.stub_abc " + /*Integer.toHexString(R.string.stub_abc) +*/ "; R.string.stub_new " + Integer.toHexString(R.string.stub_new));
     }
 }
