@@ -57,6 +57,7 @@ class LibraryPlugin extends AppPlugin {
         super.afterEvaluate(released)
 
         if (released) { //< apply: 'com.android.application'
+            // why?
             // Set application id
             def manifest = new XmlParser().parse(android.sourceSets.main.manifestFile)
             android.defaultConfig.applicationId = manifest.@package
@@ -70,6 +71,7 @@ class LibraryPlugin extends AppPlugin {
                 project.dependencies.add('provided', project.files(it))
             }
 
+            // why?
             // Resolve the transform tasks
             project.preBuild.doLast {
                 def ts = project.tasks.withType(TransformTask.class)
@@ -130,8 +132,8 @@ class LibraryPlugin extends AppPlugin {
         small.jar = project.jarReleaseClasses
 
         variant.assemble.doLast {
-            // 作用是什么？
-            // 后续其他插件需要依赖lib插件jar包？
+            // 备份编译产物到缓存
+            // 后续其他插件需要依赖lib插件的公共jar包
             // Generate jar file to root pre-jar directory
             // FIXME: Create a task for this
             def jarName = getJarName(project)
@@ -143,6 +145,7 @@ class LibraryPlugin extends AppPlugin {
 //                Log.success "jar dir($small.javac.destinationDir) to destFile($jarFile)"
             }
 
+            // 更新自身的public.txt
             // Backup R.txt to public.txt
             // FIXME: Create a task for this
             if (!small.symbolFile.exists())  return

@@ -107,9 +107,10 @@ class AppPlugin extends BundlePlugin {
             }
         }
         collectAarsOfLibrary(project, mUserLibAars)
-        mProvidedProjects.addAll(rootSmall.hostStubProjects)
+        mProvidedProjects.addAll(rootSmall.hostStubProjects)    // 添加默认的hostStub依赖
 
-        // 编译lib公共插件时，移除对lib的依赖
+        // 编译lib公共插件时，移除其他module对当前所有libs的依赖
+        // 单独打lib包没有问；如果本地有App+Lib的工程模式，会出现warning!
         if (rootSmall.isBuildingLibs()) {
             // While building libs, `lib.*' modules are changing to be an application
             // module and cannot be depended by any other modules. To avoid warnings,
@@ -208,6 +209,7 @@ class AppPlugin extends BundlePlugin {
         return mLibraryJars
     }
 
+    // 目的是？
     protected void resolveReleaseDependencies() {
         // Pre-split all the jar dependencies (deep level)
         def compile = project.configurations.compile
@@ -1224,6 +1226,7 @@ class AppPlugin extends BundlePlugin {
         small.retainedAars = mUserLibAars
     }
 
+    // todo: debug
     protected static def collectAarsOfLibrary(Project lib, HashSet outAars) {
         // lib.* self
         outAars.add(group: lib.group, name: lib.name, version: lib.version)
@@ -1549,8 +1552,8 @@ class AppPlugin extends BundlePlugin {
 
     /**
      * Hook javac task to split libraries' R.class <br/>
-     * 重新编译个lib的R.class文件，以便能应用修改了的资源ID;
-     * 由于没有lib库没有静态内联优化，因此无需重新编译其他class文件！
+     * 在javac后重新编译App的R.class文件，以便后续编译App源码时 能应用修改了的资源ID;
+     * 由于lib库工程(以及aar)没有静态内联优化，因此无需重新编译其他class文件！
      */
     private def hookJavac(Task javac, boolean minifyEnabled) {
         addClasspath(javac)
