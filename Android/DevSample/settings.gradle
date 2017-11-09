@@ -1,11 +1,11 @@
 include ':small'
 
 def externalModules = [
-        ':app', ':app+stub',
-        ':app.main', ':app.home', ':app.detail', ':app.mine', ':app.ok-if-stub',
-        ':web.about',
-        ':lib.utils', ':lib.style', ':lib.afterutils', ':lib.analytics',
-        ':jni_plugin', ':vendor-aar'
+        ':app', /*':app+stub',*/
+        ':app.detail',//        ':app.main', ':app.home', ':app.detail', ':app.mine', ':app.ok-if-stub',
+//        ':web.about',
+        ':lib.style',//        ':lib.utils', ':lib.style', ':lib.afterutils', ':lib.analytics',
+//        ':jni_plugin', ':vendor-aar'
 ] as String[]
 
 include externalModules

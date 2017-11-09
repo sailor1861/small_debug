@@ -1057,6 +1057,7 @@ class AppPlugin extends BundlePlugin {
                 return true
             }
         }
+//        Log.result "[shouldStripInput] aarPath: " + aarPath.getInputFile()
         return false
     }
 
@@ -1123,13 +1124,16 @@ class AppPlugin extends BundlePlugin {
      */
     private void hookMergeAssets(MergeSourceSetFolders t) {
         stripAarFiles(t, { paths ->
+            Log.header "[hookMergeAssets] inputDirectorySets($t.inputDirectorySets), outputDir($t.outputDir)"
             t.inputDirectorySets.each {
                 // configName: 对于aar，就是版本号(23.2.1)；对于Module，一般都是(main, release)
                 if (it.configName == 'main' || it.configName == 'release') return
 
                 it.sourceFiles.each {
+//                    Log.header "[hookMergeAssets] Check AssetsSourceFiles($it)"
                     if (shouldStripInput(it)) {
                         paths.add(it)
+                        Log.header "[hookMergeAssets] fliterAssetsSourceFiles($it)"
                     }
                 }
             }
@@ -1289,7 +1293,6 @@ class AppPlugin extends BundlePlugin {
         }
 
         // 解决Manifest合并时的错误！
-        // Q: 上一步都去除了，这里为啥还会有报错！
         // Hook process-manifest task to remove the `android:icon' and `android:label' attribute
         // which declared in the plugin `AndroidManifest.xml' application node. (for #11)
         processManifest.doLast { MergeManifests it ->
@@ -1303,7 +1306,7 @@ class AppPlugin extends BundlePlugin {
                     'android:allowBackup', 'android:supportsRtl'
             ]
 
-            Log.footer "[${project.name}] gen manifestOutputFile($manifestFile)"
+            Log.footer "[${project.name}] from ($it.manifestInputs) gen manifestOutputFile($manifestFile)"
 
             // We don't use XmlParser but simply parse each line cause this should be faster
             manifestFile.eachLine { line ->

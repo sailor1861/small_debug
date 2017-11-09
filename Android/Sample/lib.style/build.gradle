@@ -23,3 +23,28 @@ dependencies {
     testCompile 'junit:junit:4.12'
     compile 'com.android.support:appcompat-v7:23.2.1'
 }
+
+
+// lib插件支持aar模式
+apply plugin: 'maven'
+
+version = "0.0.1-SNAPSHOT"
+
+uploadArchives {
+    repositories {
+        mavenDeployer {
+//            repository(
+//                    url: "http://10.168.66.124:8084/nexus/content/repositories/releases/") {
+//                authentication(userName: nexusUsername, password: nexusPassword)
+//                pom.groupId = "com.example.mysmall.lib.style"
+//                pom.artifactId = "libstyle"
+//            }
+            snapshotRepository(
+                    url: "http://10.168.66.124:8084/nexus/content/repositories/snapshots/") {
+                authentication(userName: nexusUsername, password: nexusPassword)
+                pom.groupId = "com.example.mysmall.lib.style"
+                pom.artifactId = "libstyle"
+            }
+        }
+    }
+}

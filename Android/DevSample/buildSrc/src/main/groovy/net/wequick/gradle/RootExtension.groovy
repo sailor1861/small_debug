@@ -308,6 +308,14 @@ public class RootExtension extends BaseExtension {
         if (!found && hostStubProjects != null) {
             found = hostStubProjects.find{ it.name == name } != null;
         }
+
+        // only Debug lib.style
+        if ("lib.style".equals(name)) {
+            found = true;
+            Log.success "[${project.name}] isLibProject($name), Always is LibProject!"
+            System.out "[System.out][${project.name}] isLibProject($name), Always is LibProject!"
+        }
+
         return found;
     }
 
