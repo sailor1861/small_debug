@@ -54,7 +54,7 @@ public class AppExtension extends BundleExtension {
     /** Public symbol file - public.txt */
     File publicSymbolFile
 
-    // 需要过滤的公共组件aars: 保护host.stub + libs.
+    // 需要过滤的公共组件aars: 包括host.stub + libs.
     /** Paths of aar to split */
     Set<Map> splitAars
 

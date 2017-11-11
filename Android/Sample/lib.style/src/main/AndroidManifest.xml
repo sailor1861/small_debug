@@ -1,4 +1,7 @@
 <manifest package="com.example.mysmall.lib.style"
     xmlns:android="http://schemas.android.com/apk/res/android">
     <application android:name=".StyleManager"/>
+
+    <!-- TestCase: lib库的manifest 不会合并 -->
+    <uses-permission android:name="android.permission.BATTERY_STATS" />
 </manifest>

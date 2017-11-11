@@ -42,6 +42,9 @@ class AppPlugin extends BundlePlugin {
 
     private static final int UNSET_TYPEID = 99
     private static final int UNSET_ENTRYID = -1
+
+    // 缓存全局的PackageIds：和工程名称绑定
+    // todo: 自定义属性替代
     protected static def sPackageIds = [:] as LinkedHashMap<String, Integer>
 
     /** 插件依赖的lib插件工程 */
@@ -494,7 +497,6 @@ class AppPlugin extends BundlePlugin {
         }
 
         // todo: 过滤ProvidedCompile('aar')
-        // Debug: 强制过滤lib.style
         if (isProvidedAar()) {
             Log.action("collectVendorAars", "Check ResolvedDependency($node.name)")
             if (node.name.contains("com.example.mysmall.lib.style")) {
@@ -630,8 +632,8 @@ class AppPlugin extends BundlePlugin {
             libEntries += SymbolParser.getResourceEntries(libSymbol)
         }
 
-        // todo : 添加ProvidedCompile aar库的R.txt
-        // compile aar
+        // 添加ProvidedCompile aar库的R.txt
+        // todo: 为啥此处缓存的lib.style-R.txt，不是lib.style库的public.txt(等同symbols/R.txt)
         if (isProvidedAar()) {
             File aarLibSymbol = new File(rootSmall.preIdsDir, "lib.style-R.txt")
             libEntries += SymbolParser.getResourceEntries(aarLibSymbol)
@@ -1262,7 +1264,7 @@ class AppPlugin extends BundlePlugin {
         // Collect aar(s) in host
         collectAarsOfProject(rootSmall.hostProject, false, smallLibAars)
 
-        // todo：添加工程依赖的aar到smallLibAars
+        // 添加工程Provided aar到smallLibAars
         // smallLibAars += aars;
         if (isProvidedAar()) {
             smallLibAars.add(group: "com.example.mysmall.lib.style", name: "libstyle", version: "0.0.1-SNAPSHOT")
@@ -1449,6 +1451,7 @@ class AppPlugin extends BundlePlugin {
             def filteredResources = new HashSet()
             def updatedResources = new HashSet()
 
+            // 收集所有公共依赖的[pkgId:pkgName]: 后续通过pkgId，找到pkgName，用于更新资源ID
             // Collect the DynamicRefTable [pkgId => pkgName]
             def libRefTable = [:]
             mTransitiveDependentLibProjects.each {
@@ -1460,9 +1463,10 @@ class AppPlugin extends BundlePlugin {
                 libRefTable.put(pkgId, pkgName)
             }
 
-            // todo : support Provided aar
+            // support Provided aar：
             //  isProvidedAar(): 很奇怪，此处调用这个方法，就会报错"Could not find method isProvidedAar() for arguments [] on task ':lib.style:processReleaseResources'"
             if (getPluginType().equals(PluginType.App)) {
+//                def pkgId = sPackageIds["com.example.mysmall.lib.style"]
                 libRefTable.put(new Integer(0x79), "com.example.mysmall.lib.style")
             }
 
@@ -1770,6 +1774,8 @@ class AppPlugin extends BundlePlugin {
                         "or gradle.properties (e.g. 'packageId=7e').")
             }
         }
+
+        // 缓存全局的PackageIds：和工程名称绑定
         sPackageIds.put(project.name, pp)
     }
 
