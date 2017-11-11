@@ -1,12 +1,10 @@
 package net.wequick.example.small.lib.utils;
 
+import android.content.Context;
 import android.content.DialogInterface;
 import android.support.v7.app.AlertDialog;
-import android.content.Context;
 import android.util.Log;
 import android.widget.Toast;
-
-import net.wequick.example.appstub.StubCustom;
 
 /**
  * Created by galen on 15/12/14.
@@ -31,6 +29,6 @@ public class UIUtils {
         dlg.show();
 
         // TestCase：公共插件，访问app+stub共享库的代码
-        new StubCustom().log(tips);
+//        new StubCustom().log(tips);
     }
 }

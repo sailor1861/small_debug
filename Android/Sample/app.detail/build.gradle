@@ -23,6 +23,17 @@ dependencies {
     compile fileTree(dir: 'libs', include: ['*.jar'])
     testCompile 'junit:junit:4.12'
     compile 'com.android.support:appcompat-v7:23.2.1'
-    compile project(':lib.style')
+
+    // project 模式
+    compile project(':lib.utils')
+//    compile project(':lib.style')
+
+    // aar 模式
+    compile 'com.example.mysmall.lib.style:libstyle:0.0.1-SNAPSHOT'
+}
+
+configurations.all {
+    // Don't cache changing modules at all.
+    resolutionStrategy.cacheChangingModulesFor 0, 'seconds'
 }
 

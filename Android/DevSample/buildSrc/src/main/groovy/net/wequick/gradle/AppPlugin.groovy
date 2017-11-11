@@ -46,7 +46,7 @@ class AppPlugin extends BundlePlugin {
 
     /** 插件依赖的lib插件工程 */
     protected Set<Project> mDependentLibProjects
-    protected Set<Project> mTransitiveDependentLibProjects
+    protected Set<Project> mTransitiveDependentLibProjects  // 等同于mProvidedProjects
     protected Set<Project> mProvidedProjects
     /** 插件依赖的普遍工程 */
     protected Set<Project> mCompiledProjects
@@ -86,8 +86,11 @@ class AppPlugin extends BundlePlugin {
         // Initialize a resource package id for current bundle
         initPackageId()
 
+        // 这里只能获取compile project('')的依赖，如何获取compile 'aar'的依赖
+        // todo: 新增一个List<ProvidedAAR>， 用于填充aar依赖
         // Get all dependencies with gradle script `compile project(':lib.*')'
         DependencySet compilesDependencies = project.configurations.compile.dependencies
+
         Set<DefaultProjectDependency> allLibs = compilesDependencies.withType(DefaultProjectDependency.class)
         Set<DefaultProjectDependency> smallLibs = []
         mUserLibAars = []
@@ -95,7 +98,7 @@ class AppPlugin extends BundlePlugin {
         mProvidedProjects = []
         mCompiledProjects = []
         allLibs.each {
-//	        Log.success "[${project.name}] afterEvaluate：check compilesDependencies($it.dependencyProject.name)"
+	        Log.success "[${project.name}] afterEvaluate：check compilesDependencies($it.dependencyProject.name)"
             // 区分lib库(公共库插件)和其他普通依赖库
             if (rootSmall.isLibProject(it.dependencyProject)) {
                 smallLibs.add(it)
@@ -205,7 +208,7 @@ class AppPlugin extends BundlePlugin {
              不过，更好的方式， 还是通过插件这里，实现自定Provided注入，更方便一键集成！
              此外，公共插件的jars, 还是需要通过这种方式注入的！
         */
-        Log.footer "project[$project] getLibraryJars$mLibraryJars)"
+//        Log.footer "project[$project] getLibraryJars$mLibraryJars)"
         return mLibraryJars
     }
 
@@ -469,6 +472,7 @@ class AppPlugin extends BundlePlugin {
         }
     }
 
+    // 收集所有Vendor.aar: compile project() + compile 'aar'
     /** Collect the vendor aars (has resources) compiling in current bundle */
     protected void collectVendorAars(Set<ResolvedDependency> outFirstLevelAars,
                                      Set<Map> outTransitiveAars) {
@@ -488,12 +492,27 @@ class AppPlugin extends BundlePlugin {
             // Ignores the dependency of local aar
             return false
         }
+
+        // todo: 过滤ProvidedCompile('aar')
+        // Debug: 强制过滤lib.style
+        if (isProvidedAar()) {
+            Log.action("collectVendorAars", "Check ResolvedDependency($node.name)")
+            if (node.name.contains("com.example.mysmall.lib.style")) {
+                Log.result("[collectVendorAars] Filter ResolvedDependency($node.name) fixed To ProvidedCompile")
+                return false;
+            }
+        }
+
+        // host、lib库中已经声明的依赖：需要排除掉
         if (small.splitAars.find { aar -> group == aar.group && name == aar.name } != null) {
             // Ignores the dependency which has declared in host or lib.*
+//            Log.result("[collectVendorAars] Ignores the dependency which has declared in host or lib.*($node.name)")
             return false
         }
+        // todo : 这里的过滤，是做什么?
         if (small.retainedAars.find { aar -> group == aar.group && name == aar.name } != null) {
             // Ignores the dependency of normal modules
+            Log.result("collectVendorAars", "Ignores the dependency of normal modules($node.name)")
             return false
         }
 
@@ -604,10 +623,20 @@ class AppPlugin extends BundlePlugin {
         if (hostSymbol.exists()) {
             libEntries += SymbolParser.getResourceEntries(hostSymbol)
         }
+
+        // compile project
         mTransitiveDependentLibProjects.each {
             File libSymbol = new File(it.projectDir, 'public.txt')
             libEntries += SymbolParser.getResourceEntries(libSymbol)
         }
+
+        // todo : 添加ProvidedCompile aar库的R.txt
+        // compile aar
+        if (isProvidedAar()) {
+            File aarLibSymbol = new File(rootSmall.preIdsDir, "lib.style-R.txt")
+            libEntries += SymbolParser.getResourceEntries(aarLibSymbol)
+        }
+
         /** 工程自身的public.txt */
         def publicEntries = SymbolParser.getResourceEntries(small.publicSymbolFile)
         /** 工程自身的R.txt：AAPT编译产物，基于他过滤出retianedEntries */
@@ -662,8 +691,9 @@ class AppPlugin extends BundlePlugin {
 //                        "Missing library resource entry: \"$k\", try to cleanLib and buildLib.")
 //            }
 
-            // Q: 为什么最后还需要再添加呢？
+            // 剩余的资源，就是插件自身的资源：添加到retainedEntries保留列表中
             be.isStyleable ? retainedStyleables.add(be) : retainedEntries.add(be)
+//            Log.action("prepareSplit", " retainedEntries.add($be), from($k)")
         }
 
         // 保留所有已经被删除的public.txt资源: 前面已经过滤过，剩余的就是已经被bundle删除掉的.
@@ -797,6 +827,7 @@ class AppPlugin extends BundlePlugin {
                 // New type
                 currType = [type: e.vtype, name: e.type, id: e.typeId, _id: e._typeId, entries: []]
                 retainedTypes.add(currType)
+//                Log.action("prepareSplit", " retainedTypes.add currType($currType) from retainedEntrie($e)")
             }
             // 记录所有IdMaps: 后续，修改XML资源ID时，需要用到
             def newResId = pid | (e._typeId << 16) | e._entryId
@@ -1050,10 +1081,13 @@ class AppPlugin extends BundlePlugin {
         return JNIUtils.getABIFlag(abis)
     }
 
+    // 是否过滤input文件
     protected boolean shouldStripInput(File input) {
         AarPath aarPath = new AarPath(project, input)
+//        Log.action("shouldStripInput", "[$project.name] check input($aarPath.inputFile)")
         for (aar in small.splitAars) {
             if (aarPath.explodedFromAar(aar)) {
+//                Log.action("shouldStripInput", "[$project.name] Strip input($aarPath.inputFile) for aar($aar)")
                 return true
             }
         }
@@ -1124,7 +1158,7 @@ class AppPlugin extends BundlePlugin {
      */
     private void hookMergeAssets(MergeSourceSetFolders t) {
         stripAarFiles(t, { paths ->
-            Log.header "[hookMergeAssets] inputDirectorySets($t.inputDirectorySets), outputDir($t.outputDir)"
+//            Log.header "[hookMergeAssets] inputDirectorySets($t.inputDirectorySets), outputDir($t.outputDir)"
             t.inputDirectorySets.each {
                 // configName: 对于aar，就是版本号(23.2.1)；对于Module，一般都是(main, release)
                 if (it.configName == 'main' || it.configName == 'release') return
@@ -1133,7 +1167,7 @@ class AppPlugin extends BundlePlugin {
 //                    Log.header "[hookMergeAssets] Check AssetsSourceFiles($it)"
                     if (shouldStripInput(it)) {
                         paths.add(it)
-                        Log.header "[hookMergeAssets] fliterAssetsSourceFiles($it)"
+//                        Log.header "[hookMergeAssets] fliterAssetsSourceFiles($it)"
                     }
                 }
             }
@@ -1162,6 +1196,8 @@ class AppPlugin extends BundlePlugin {
             }
             // 通过扩展的方式，添加成员变量，以便doLast时，能够恢复;
             it.extensions.add('strips', strips)
+
+            Log.header "[stripAarFiles] HookTask.doFirst($t.name), stripPaths($stripPaths)"
         }
         // 以便doLast时，恢复ProvidedCompile的aar;
         t.doLast {
@@ -1226,8 +1262,18 @@ class AppPlugin extends BundlePlugin {
         // Collect aar(s) in host
         collectAarsOfProject(rootSmall.hostProject, false, smallLibAars)
 
+        // todo：添加工程依赖的aar到smallLibAars
+        // smallLibAars += aars;
+        if (isProvidedAar()) {
+            smallLibAars.add(group: "com.example.mysmall.lib.style", name: "libstyle", version: "0.0.1-SNAPSHOT")
+        }
+
         small.splitAars = smallLibAars
         small.retainedAars = mUserLibAars
+    }
+
+    private boolean isProvidedAar() {
+        getPluginType().equals(PluginType.App)
     }
 
     // todo: debug
@@ -1237,6 +1283,8 @@ class AppPlugin extends BundlePlugin {
         // lib.* self for android plugin 2.3.0+
         File dir = lib.projectDir
         outAars.add(group: dir.parentFile.name, name: dir.name, version: lib.version)
+
+        Log.action("collectAarsOfLibrary", " add $lib.name to outAars($outAars)")
     }
 
     protected def collectAarsOfProject(Project project, boolean isLib, HashSet outAars) {
@@ -1253,6 +1301,8 @@ class AppPlugin extends BundlePlugin {
         if (isLib) {
             collectAarsOfLibrary(project, outAars)
         }
+
+        Log.action("collectAarsOfLibrary", " add $project.name to outAars($outAars), isLib($isLib)")
     }
 
     private def hookProcessManifest(Task processManifest) {
@@ -1263,11 +1313,11 @@ class AppPlugin extends BundlePlugin {
         // out the manifest dependencies from them.
         if (processManifest.hasProperty('providers')) {
             processManifest.providers = []
+            Log.header "[${project.name}] hookProcessManifest($processManifest.name) hasProperty('providers')! so, don't filter lib.xxx "
         } else {
             processManifest.doFirst { MergeManifests it ->
+                Log.header "[${project.name}] hookProcessManifest($processManifest.name) MergeManifestsTask($it.name) Task.project($it.project.name), pluginType($pluginType)"
                 if (pluginType != PluginType.App) return
-
-            Log.header "[${project.name}] processManifest($processManifest.name) MergeManifestsTask($it.name) Task.project($it.project.name)"
 
                 // 遍历每一个Task的compile依赖，排除lib库
                 def libs = it.libraries
@@ -1412,6 +1462,11 @@ class AppPlugin extends BundlePlugin {
                 def pkgName = libAapt.packageForR
                 def pkgId = sPackageIds[it.name]
                 libRefTable.put(pkgId, pkgName)
+            }
+
+            // todo : support Provided aar
+            if (isProvidedAar()) {
+                libRefTable.put(new Integer(0x79), "com.example.mysmall.lib.style")
             }
 
             Aapt aapt = new Aapt(unzipApDir, rJavaFile, symbolFile, rev)

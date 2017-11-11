@@ -54,6 +54,7 @@ public class AppExtension extends BundleExtension {
     /** Public symbol file - public.txt */
     File publicSymbolFile
 
+    // éœ€è¦è¿‡æ»¤çš„å…¬å…±ç»„ä»¶aars: ä¿æŠ¤host.stub + libs.
     /** Paths of aar to split */
     Set<Map> splitAars
 
@@ -62,7 +63,7 @@ public class AppExtension extends BundleExtension {
 
     /**
      * File of split R.java <br/>
-     * ·ÖÀëµÄR.java: Ö»ÓĞApp×ÔÉíµÄR.java: Î´ºÏ³É¹«¹²RÇ°µÄApp×ÔÉíµÄR.java; ÓÃÓÚ´ò°üµ½²å¼ş×ÔÉí°üÄÚ;
+     * åˆ†ç¦»çš„R.java: åªæœ‰Appè‡ªèº«çš„R.java: æœªåˆæˆå…¬å…±Rå‰çš„Appè‡ªèº«çš„R.java; ç”¨äºæ‰“åŒ…åˆ°æ’ä»¶è‡ªèº«åŒ…å†…;
      */
     File splitRJavaFile
 

@@ -49,7 +49,7 @@ public class MyTextView extends TextView {
         // TestCase：lib插件访问系统资源，访问support包资源
         // TestCase: lib插件访问app+sub资源
         Log.w("yedr", "[lib.utils]MyTextView  android.R " + Integer.toHexString(android.R.style.Theme_Holo_Light_NoActionBar) +
-                "; android.support.v7.appcompat.R" + Integer.toHexString(android.support.v7.appcompat.R.style.Theme_AppCompat_Light_NoActionBar) +
-                "; R.string.stub_new" + Integer.toHexString(R.string.stub_new));
+                "; android.support.v7.appcompat.R" + Integer.toHexString(android.support.v7.appcompat.R.style.Theme_AppCompat_Light_NoActionBar)
+                /*"; R.string.stub_new" + Integer.toHexString(R.string.stub_new)*/);
     }
 }
