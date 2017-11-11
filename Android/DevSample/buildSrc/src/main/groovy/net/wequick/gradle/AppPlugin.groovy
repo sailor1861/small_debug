@@ -1272,10 +1272,6 @@ class AppPlugin extends BundlePlugin {
         small.retainedAars = mUserLibAars
     }
 
-    private boolean isProvidedAar() {
-        getPluginType().equals(PluginType.App)
-    }
-
     // todo: debug
     protected static def collectAarsOfLibrary(Project lib, HashSet outAars) {
         // lib.* self
@@ -1465,7 +1461,8 @@ class AppPlugin extends BundlePlugin {
             }
 
             // todo : support Provided aar
-            if (isProvidedAar()) {
+            //  isProvidedAar(): 很奇怪，此处调用这个方法，就会报错"Could not find method isProvidedAar() for arguments [] on task ':lib.style:processReleaseResources'"
+            if (getPluginType().equals(PluginType.App)) {
                 libRefTable.put(new Integer(0x79), "com.example.mysmall.lib.style")
             }
 
@@ -1774,6 +1771,10 @@ class AppPlugin extends BundlePlugin {
             }
         }
         sPackageIds.put(project.name, pp)
+    }
+
+    private boolean isProvidedAar() {
+        getPluginType().equals(PluginType.App)
     }
 
     /**
