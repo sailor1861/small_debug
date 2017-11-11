@@ -2,11 +2,9 @@ package net.wequick.gradle
 
 import net.wequick.gradle.aapt.SymbolParser
 import net.wequick.gradle.support.KotlinCompat
-import net.wequick.gradle.tasks.CleanBundleTask
 import net.wequick.gradle.tasks.LintTask
 import net.wequick.gradle.util.DependenciesUtils
 import net.wequick.gradle.util.Log
-import net.wequick.gradle.util.TaskUtils
 import org.gradle.api.Project
 import org.gradle.api.Task
 import org.gradle.api.execution.TaskExecutionListener
@@ -145,23 +143,24 @@ class RootPlugin extends BasePlugin {
 
             // 自动添加hostStub库依赖：Host和所有插件，均可以依赖hostStub库
             if (!rootExt.hostStubProjects.empty) {
-                rootExt.hostStubProjects.each { stub ->
-                    rootExt.hostProject.afterEvaluate {
-                        it.dependencies.add('compile', stub)
-                    }
-                    rootExt.appProjects.each {
-                        it.afterEvaluate {
-                            it.dependencies.add('compile', stub)
-                        }
-                    }
-                    rootExt.libProjects.each {
-                        it.afterEvaluate {
-                            it.dependencies.add('compile', stub)
-                        }
-                    }
-
-                    stub.task('cleanLib', type: CleanBundleTask)
-                }
+                // 简化调试环境时，暂时屏蔽自动注入stub
+//                rootExt.hostStubProjects.each { stub ->
+//                    rootExt.hostProject.afterEvaluate {
+//                        it.dependencies.add('compile', stub)
+//                    }
+//                    rootExt.appProjects.each {
+//                        it.afterEvaluate {
+//                            it.dependencies.add('compile', stub)
+//                        }
+//                    }
+//                    rootExt.libProjects.each {
+//                        it.afterEvaluate {
+//                            it.dependencies.add('compile', stub)
+//                        }
+//                    }
+//
+//                    stub.task('cleanLib', type: CleanBundleTask)
+//                }
             }
 
             Log.footer "$project.name afterEvaluate: host($rootExt.hostProject) stub($rootExt.hostStubProjects)"
