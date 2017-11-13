@@ -73,18 +73,22 @@ public class RootExtension extends BaseExtension {
      */
     protected KotlinConfig kotlin
 
+    // Small 自身功能
     /**
      * If <tt>true</tt> build plugins to host assets as *.apk,
      * otherwise build to host smallLibs as *.so
      */
     boolean buildToAssets = false
 
+    // 仅用于打印消息！
     /** Count of libraries */
     protected int libCount
 
     /** Count of bundles */
     protected int bundleCount
 
+    // 其他各子project， 需要依赖SmallSdk，就是通过compile smallProject
+    // todo: 去除，改为aar引用
     /** Project of Small AAR module */
     protected Project smallProject
 
@@ -121,6 +125,7 @@ public class RootExtension extends BaseExtension {
     private File preLinkAarDir
     private File preLinkJarDir
 
+    // 解析Gradle Task：用于区分buildLib、buildBundle: 可以移植到AndroidPlugin
     protected String mP // the executing gradle project name
     protected String mT // the executing gradle task name
 
@@ -129,6 +134,7 @@ public class RootExtension extends BaseExtension {
 
         hostModuleName = 'app'
 
+        // Create pre Dirs: 可以move到AndroidPlugin
         preBuildDir = new File(project.projectDir, FD_BUILD_SMALL)
         def interDir = new File(preBuildDir, FD_INTERMEDIATES)
         def jarDir = new File(interDir, FD_PRE_JAR)
@@ -140,7 +146,7 @@ public class RootExtension extends BaseExtension {
         preLinkJarDir = new File(preLinkDir, FD_JAR)
         preLinkAarDir = new File(preLinkDir, FD_AAR)
 
-        // Parse gradle task
+        // Parse gradle task: 可以move到AndroidPlugin
         def sp = project.gradle.startParameter
         def t = sp.taskNames[0]
         if (t != null) {

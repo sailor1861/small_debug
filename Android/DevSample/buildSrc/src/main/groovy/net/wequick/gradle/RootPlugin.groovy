@@ -46,13 +46,15 @@ class RootPlugin extends BasePlugin {
 
         project.afterEvaluate {
 
+            // 收集子modules的[类型:names]
+            // todo: rootExt.bundleModules 哪里赋值的，没有找到
             def userBundleTypes = [:]
             rootExt.bundleModules.each { type, names ->
                 names.each {
                     userBundleTypes.put(it, type)
                 }
             }
-            Log.header "project[$project] userBundleTypes($userBundleTypes)"
+            Log.header "project[$project].afterEvaluate userBundleTypes($userBundleTypes)"
 
             // Configure versions
             def base = rootExt.android
@@ -170,6 +172,7 @@ class RootPlugin extends BasePlugin {
 
     }
 
+    // 统一各子工程的配置
     protected void configVersions(Project p, RootExtension.AndroidConfig base) {
         if (!p.hasProperty('android')) return
 
@@ -476,7 +479,6 @@ class RootPlugin extends BasePlugin {
         }
 
         // Copy *.ap_
-        // 作用是？  --没有发现有访问处？
         def aapt = ext.aapt
         def preApDir = small.preApDir
         if (!preApDir.exists()) preApDir.mkdir()
@@ -496,7 +498,7 @@ class RootPlugin extends BasePlugin {
         def srcIdsFile = new File(aapt.textSymbolOutputDir, 'R.txt')
         if (srcIdsFile.exists()) {
             def idsFileName = "${libName}-R.txt"
-            def keysFileName = 'R.keys.txt'
+            def keysFileName = 'R.keys.txt'     // 这个文件是关键， 需要过滤该文件内的值到最终输出产物?
             def dstIdsFile = new File(preIdsDir, idsFileName)
             def keysFile = new File(preIdsDir, keysFileName)
             def addedKeys = []
@@ -509,7 +511,7 @@ class RootPlugin extends BasePlugin {
             def keysPw = new PrintWriter(keysFile.newWriter(true))
             srcIdsFile.eachLine { s ->
                 def key = SymbolParser.getResourceDeclare(s)
-                if (addedKeys.contains(key)) return
+                if (addedKeys.contains(key)) return // 过滤重名key
                 idsPw.println(s)
                 keysPw.println(key)
             }
@@ -518,7 +520,7 @@ class RootPlugin extends BasePlugin {
             keysPw.flush()
             keysPw.close()
 
-            Log.success "project[$libName] copy SymbolTextFile: copy($srcIdsFile.path) to keysFile($keysFile)"
+            Log.success "project[$libName] copy SymbolTextFile: copy($srcIdsFile.path) to dstIdsFile($dstIdsFile)"
         }
 
         // D.txt：host +　每一个lib的依赖；
