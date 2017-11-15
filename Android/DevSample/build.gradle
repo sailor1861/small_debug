@@ -40,4 +40,5 @@ small {
 
     // 新增扩展属性：配合外部CI传参
     publicDir = "publicCache"
+    destOutputDir = "D:\\code\\Small\\Android\\Sample\\app\\destLibs"
 }

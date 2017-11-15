@@ -45,7 +45,9 @@ public class RootExtension extends BaseExtension {
      */
     String publicDir = FD_BUILD_SMALL;
 
-    /** 
+    String destOutputDir
+
+    /**
      * Version of aar net.wequick.small:small
      * default to `gradle-small' plugin version 
      */
@@ -188,14 +190,14 @@ public class RootExtension extends BaseExtension {
         preLinkAarDir = new File(preLinkDir, FD_AAR)
     }
 
-    public boolean getBuildToAssets() {
-        Log.result "getBuildToAssets $buildToAssets"
-        return buildToAssets
-    }
 
     public String getPublicDir() {
         Log.result "getPublicDir $publicDir"
         return publicDir
+    }
+
+    public File getOutBundleDir() {
+        return outBundleDir;
     }
 
     public File getPreBuildDir() {

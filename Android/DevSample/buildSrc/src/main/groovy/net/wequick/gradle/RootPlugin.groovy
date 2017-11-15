@@ -80,7 +80,10 @@ class RootPlugin extends BasePlugin {
                 if (it.name == rootExt.hostModuleName) {
                     // Host
                     it.apply plugin: HostPlugin
-                    rootExt.outputBundleDir = new File(it.projectDir, SMALL_LIBS)
+
+                    // 改成Ext配置属性
+//                    rootExt.outputBundleDir = new File(it.projectDir, SMALL_LIBS)
+                    rootExt.outputBundleDir = new File(rootExt.destOutputDir)
                     rootExt.hostProject = it
                 } else if (it.name.startsWith('app+')) {
                     rootExt.hostStubProjects.add(it)
@@ -208,6 +211,8 @@ class RootPlugin extends BasePlugin {
     @Override
     protected void createTask() {
         super.createTask()
+
+        // todo: 这个地方，也需要在project.afterEvaluate()后，才能支持ext
         project.task('cleanLib', group: 'small', description: 'Clean all libraries', type: Delete) {
             delete small.preBuildDir
         }
