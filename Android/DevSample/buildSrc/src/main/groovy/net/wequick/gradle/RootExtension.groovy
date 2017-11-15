@@ -39,6 +39,12 @@ public class RootExtension extends BaseExtension {
     public static final String PLUGIN_VERSION = '1.2.0-alpha6'
     public static final VersionNumber PLUGIN_REVISION = VersionNumber.parse(PLUGIN_VERSION)
 
+    /**
+     * the public cache dir
+     * default to #FD_BUILD_SMALL
+     */
+    String publicDir = FD_BUILD_SMALL;
+
     /** 
      * Version of aar net.wequick.small:small
      * default to `gradle-small' plugin version 
@@ -135,16 +141,7 @@ public class RootExtension extends BaseExtension {
         hostModuleName = 'app'
 
         // Create pre Dirs: 可以move到AndroidPlugin
-        preBuildDir = new File(project.projectDir, FD_BUILD_SMALL)
-        def interDir = new File(preBuildDir, FD_INTERMEDIATES)
-        def jarDir = new File(interDir, FD_PRE_JAR)
-        preBaseJarDir = new File(jarDir, FD_BASE)
-        preLibsJarDir = new File(jarDir, FD_LIBS)
-        preApDir = new File(interDir, FD_PRE_AP)
-        preIdsDir = new File(interDir, FD_PRE_IDS)
-        def preLinkDir = new File(interDir, FD_PRE_LINK)
-        preLinkJarDir = new File(preLinkDir, FD_JAR)
-        preLinkAarDir = new File(preLinkDir, FD_AAR)
+        prepareBuildEnv(project)
 
         // Parse gradle task: 可以move到AndroidPlugin
         def sp = project.gradle.startParameter
@@ -170,6 +167,35 @@ public class RootExtension extends BaseExtension {
         }
 
         Log.header "project($project) mP($mP), mT($mT)"
+    }
+
+    /**
+     * prepare Build Environment
+     * 获取扩展属性，因此需要在Project.afterEvaluate后执行，才可以！
+     * @param project
+     */
+    public void prepareBuildEnv(Project project) {
+//        preBuildDir = new File(project.projectDir, FD_BUILD_SMALL)
+        preBuildDir = new File(project.projectDir, getPublicDir())
+        def interDir = new File(preBuildDir, FD_INTERMEDIATES)
+        def jarDir = new File(interDir, FD_PRE_JAR)
+        preBaseJarDir = new File(jarDir, FD_BASE)
+        preLibsJarDir = new File(jarDir, FD_LIBS)
+        preApDir = new File(interDir, FD_PRE_AP)
+        preIdsDir = new File(interDir, FD_PRE_IDS)
+        def preLinkDir = new File(interDir, FD_PRE_LINK)
+        preLinkJarDir = new File(preLinkDir, FD_JAR)
+        preLinkAarDir = new File(preLinkDir, FD_AAR)
+    }
+
+    public boolean getBuildToAssets() {
+        Log.result "getBuildToAssets $buildToAssets"
+        return buildToAssets
+    }
+
+    public String getPublicDir() {
+        Log.result "getPublicDir $publicDir"
+        return publicDir
     }
 
     public File getPreBuildDir() {
@@ -228,6 +254,7 @@ public class RootExtension extends BaseExtension {
         return aarVersion
     }
 
+    /** todo: 没有看到写这个Map的地方？ */
     Map<String, Set<String>> bundleModules = [:]
 
     public void bundles(String type, String name) {

@@ -46,6 +46,8 @@ class RootPlugin extends BasePlugin {
 
         project.afterEvaluate {
 
+            rootExt.prepareBuildEnv(project)
+
             // 收集子modules的[类型:names]
             // todo: rootExt.bundleModules 哪里赋值的，没有找到
             def userBundleTypes = [:]
@@ -54,7 +56,9 @@ class RootPlugin extends BasePlugin {
                     userBundleTypes.put(it, type)
                 }
             }
+            // 数据一直是空的！
             Log.header "project[$project].afterEvaluate userBundleTypes($userBundleTypes)"
+            getSmall().getPublicDir()
 
             // Configure versions
             def base = rootExt.android
@@ -296,6 +300,8 @@ class RootPlugin extends BasePlugin {
 
             println '### Bundles'
             println()
+
+            Log.header "at ($project).createTask "
 
             // modules
             def rows = []

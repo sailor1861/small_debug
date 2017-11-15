@@ -37,4 +37,7 @@ small {
         buildToolsVersion = "25.0.2"
         supportVersion = "25.1.0"
     }
+
+    // 新增扩展属性：配合外部CI传参
+    publicDir = "publicCache"
 }
