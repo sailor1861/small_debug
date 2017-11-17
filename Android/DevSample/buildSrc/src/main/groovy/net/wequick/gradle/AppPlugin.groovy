@@ -47,13 +47,17 @@ class AppPlugin extends BundlePlugin {
     // todo: 自定义属性替代
     protected static def sPackageIds = [:] as LinkedHashMap<String, Integer>
 
+    // todo：重点改造项目
     /** 插件依赖的lib插件工程 */
-    protected Set<Project> mDependentLibProjects
-    protected Set<Project> mTransitiveDependentLibProjects  // 等同于mProvidedProjects
+    protected Set<Project> mDependentLibProjects    // 没有消费者?
+    protected Set<Project> mTransitiveDependentLibProjects  // 等同于mProvidedProjects， 到处使用， 有啥区别呢?
     protected Set<Project> mProvidedProjects
+
     /** 插件依赖的普遍工程 */
-    protected Set<Project> mCompiledProjects
-    protected Set<Map> mUserLibAars
+    protected Set<Project> mCompiledProjects    // 没有消费者?
+    protected Set<Map> mUserLibAars // App自身依赖的所有Aars，即需要打包保留的Aars
+
+    // todo：重点改造项目，新增对ProvidedAar的支持
     /** 插件所有Provided依赖：只编译，不打包的依赖 */
     protected Set<File> mLibraryJars
     protected File mMinifyJar
@@ -107,14 +111,20 @@ class AppPlugin extends BundlePlugin {
             if (rootSmall.isLibProject(it.dependencyProject)) {
                 smallLibs.add(it)
                 mProvidedProjects.add(it.dependencyProject)
-                mDependentLibProjects.add(it.dependencyProject)
+                mDependentLibProjects.add(it.dependencyProject)     // why: 此处添加完成后，没有在使用？？
             } else {
                 mCompiledProjects.add(it.dependencyProject)
+
+                // 收集每一个compile工程的aar依赖库：要支持
+                // todo：新增对compile aar的支持
                 collectAarsOfLibrary(it.dependencyProject, mUserLibAars)
             }
         }
+        // 收集本工程的aar依赖库：要支持
         collectAarsOfLibrary(project, mUserLibAars)
-        mProvidedProjects.addAll(rootSmall.hostStubProjects)    // 添加默认的hostStub依赖
+
+        // 添加默认的hostStub依赖：改为对hostStub的aar依赖; 【重要修改】
+        mProvidedProjects.addAll(rootSmall.hostStubProjects)
 
         // 编译lib公共插件时，移除其他module对当前所有libs的依赖
         // 单独打lib包没有问；如果本地有App+Lib的工程模式，会出现warning!
@@ -155,6 +165,7 @@ class AppPlugin extends BundlePlugin {
         // Collect the jars in `build-small/intermediates/small-pre-jar/base'
         def baseJars = project.fileTree(dir: rootSmall.preBaseJarDir, include: ['*.jar'])
         mLibraryJars.addAll(baseJars.files)
+        Log.passed "[getLibraryJars] add($baseJars.files) from `build-small/intermediates/small-pre-jar/base'"
 
         // Collect the jars of `compile project(lib.*)' with absolute file path, fix issue #65
         Set<String> libJarNames = []
@@ -172,9 +183,11 @@ class AppPlugin extends BundlePlugin {
         }
 
         mLibraryJars.addAll(libDependentJars)
+        Log.passed "[getLibraryJars] add($libDependentJars) from `compile project(lib.*)'"
 
-        // todo: 需要移除;
-        // 能否从其他地方获取？ -- 打hostStub时，缓存到buildCache
+
+        // todo : 能否从其他地方获取？ -- 打hostStub时，缓存到buildCache
+        // AH方案下， 插件已经通过Provied 依赖了fatJar包，是否可以省略宿主的jars, support前期也不支持;
         // Collect stub and small jars in host
         Set<Project> sharedProjects = []
         sharedProjects.addAll(rootSmall.hostStubProjects)
@@ -608,6 +621,7 @@ class AppPlugin extends BundlePlugin {
                     // If we don't split the aar then we should reserved all it's transitive aars.
                     collectTransitiveAars(it, reservedAars)
                 }
+                // 这个是什么呢？
                 reservedAars.each {
                     mUserLibAars.add(group: it.moduleGroup, name: it.moduleName, version: it.moduleVersion)
                 }
@@ -1253,6 +1267,7 @@ class AppPlugin extends BundlePlugin {
         def symbolsPath = small.aapt.textSymbolOutputDir.path
         android.aaptOptions.additionalParameters '--output-text-symbols', symbolsPath
 
+        // 所有公共插件、共享库的Aars：打App插件时，要全部过滤掉 【核心数据】
         // Resolve dependent AARs
         // ----------------------
         def smallLibAars = new HashSet() // the aars compiled in host or lib.*
@@ -1270,15 +1285,18 @@ class AppPlugin extends BundlePlugin {
             collectAarsOfProject(lib, true, smallLibAars)
         }
 
+        // AH方案：不支持hostProject的aar依赖！
         // Collect aar(s) in host
         collectAarsOfProject(rootSmall.hostProject, false, smallLibAars)
 
         // 添加工程Provided aar到smallLibAars
+        // todo：遍历compile aar依赖；过滤出Provided，添加到smallLibAars队列
         // smallLibAars += aars;
         if (isProvidedAar()) {
             smallLibAars.add(group: "com.example.mysmall.lib.style", name: "libstyle", version: "0.0.1-SNAPSHOT")
         }
 
+        // 所有上述逻辑：目标就是下述两个数据
         small.splitAars = smallLibAars
         small.retainedAars = mUserLibAars
     }

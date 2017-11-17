@@ -45,6 +45,7 @@ public class AppExtension extends BundleExtension {
     /** File of resources.ap_ */
     File apFile
 
+    // Application工程普通compile的R.java
     /** File of R.java */
     File rJavaFile
 
@@ -54,10 +55,13 @@ public class AppExtension extends BundleExtension {
     /** Public symbol file - public.txt */
     File publicSymbolFile
 
-    // 需要过滤的公共组件aars: 包括host.stub + libs.
+    // 需要过滤的公共组件aars: 包括host.stub + libs. 【最核心数据，新增支持aar模式】
+    // 对应AppPlugin.smallLibAars
     /** Paths of aar to split */
     Set<Map> splitAars
 
+    // 需要保留的aars
+    // 对应AppPlugin.mUserLibAars
     /** Paths of aar to retain */
     Set<Map> retainedAars
 
