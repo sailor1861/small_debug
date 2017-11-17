@@ -48,7 +48,10 @@ class RootPlugin extends BasePlugin {
 
             rootExt.prepareBuildEnv(project)
 
-            // 收集子modules的[类型:names]
+            // add ext destOutputDir support
+            rootExt.outputBundleDir = new File(rootExt.destOutputDir)
+
+            // 收集子modules的[类型:names]：数据一直是空的！
             // todo: rootExt.bundleModules 哪里赋值的，没有找到
             def userBundleTypes = [:]
             rootExt.bundleModules.each { type, names ->
@@ -56,7 +59,6 @@ class RootPlugin extends BasePlugin {
                     userBundleTypes.put(it, type)
                 }
             }
-            // 数据一直是空的！
             Log.header "project[$project].afterEvaluate userBundleTypes($userBundleTypes)"
             getSmall().getPublicDir()
 
@@ -70,6 +72,8 @@ class RootPlugin extends BasePlugin {
                 }
             }
 
+            // todo: AH方案：插件开发环境下，只有一个;
+            // 宿主环境下，可能有多个；但是都是不是插件，而是普通的compile!
             // Configure sub projects
             project.subprojects {
                 if (it.name == 'small') {
@@ -81,9 +85,8 @@ class RootPlugin extends BasePlugin {
                     // Host
                     it.apply plugin: HostPlugin
 
-                    // 改成Ext配置属性
+                    // 改成Ext配置属性 @ RootExtension.prepareBuildEnv()
 //                    rootExt.outputBundleDir = new File(it.projectDir, SMALL_LIBS)
-                    rootExt.outputBundleDir = new File(rootExt.destOutputDir)
                     rootExt.hostProject = it
                 } else if (it.name.startsWith('app+')) {
                     rootExt.hostStubProjects.add(it)
@@ -134,6 +137,7 @@ class RootPlugin extends BasePlugin {
 
                 // 配置buildLib.doLast，编译插件后的后处理任务
                 // todo: AndroidPlugin 内实现是否也可以呢？
+                // buildLib的属性 是从哪里来的？
                 if (it.hasProperty('buildLib')) {
                     Log.success "project($it.project) hasProperty buildLib"
                     it.small.buildIndex = ++rootExt.libCount
@@ -141,10 +145,15 @@ class RootPlugin extends BasePlugin {
                         buildLib(it.project)
                     }
                 } else if (it.hasProperty('buildBundle')) {
+                    Log.success "project($it.project) hasProperty buildBundle"
                     it.small.buildIndex = ++rootExt.bundleCount
+                    it.tasks['buildBundle'].doLast {
+                        buildBundle(it.project)
+                    }
                 }
             }
 
+            // todo : 去除
             if (rootExt.hostProject == null) {
                 throw new RuntimeException(
                         "Cannot find host module with name: '${rootExt.hostModuleName}'!")
@@ -212,6 +221,7 @@ class RootPlugin extends BasePlugin {
     protected void createTask() {
         super.createTask()
 
+        // todo: 可去除！
         // todo: 这个地方，也需要在project.afterEvaluate()后，才能支持ext
         project.task('cleanLib', group: 'small', description: 'Clean all libraries', type: Delete) {
             delete small.preBuildDir
@@ -223,6 +233,7 @@ class RootPlugin extends BasePlugin {
         project.task('buildBundle', group: 'small', description: 'Build all bundles')
         project.task('smallLint', type: LintTask, group: 'small', description: 'Verify bundles')
 
+        // what todo
         project.task('small', group: 'small', description: 'Print bundle environments').doLast {
 
             println()
@@ -266,6 +277,8 @@ class RootPlugin extends BasePlugin {
                 } catch (Exception e) {
                     aarVersion = 'unspecific'
                 }
+
+                // 不知道啥用处，是否可以全部去除？
                 def module = small.hostProject.configurations.compile
                         .resolvedConfiguration.firstLevelModuleDependencies.find {
                     it.moduleGroup == 'net.wequick.small' && it.moduleName == 'small'
@@ -534,6 +547,7 @@ class RootPlugin extends BasePlugin {
             Log.success "project[$libName] copy SymbolTextFile: copy($srcIdsFile.path) to dstIdsFile($dstIdsFile)"
         }
 
+        // todo：拦截buildBundle.doLast, 实现D.txt导出aar依赖关系！
         // D.txt：host +　每一个lib的依赖；
         // 作用：small.splitAars 内需要记录所有依赖的aar、jar, 就是从这里获取数据的！
         // Backup dependencies
@@ -566,6 +580,7 @@ class RootPlugin extends BasePlugin {
             def aarPw = new PrintWriter(aarLinkFile.newWriter(true))
             def jarPw = new PrintWriter(jarLinkFile.newWriter(true))
 
+            // todo：需要替代依赖
             // Cause the later aar(as fresco) may dependent by 'com.android.support:support-compat'
             // which would duplicate with the builtin 'appcompat' and 'support-v4' library in host.
             // Hereby we also mark 'support-compat' has compiled in host.
@@ -609,6 +624,20 @@ class RootPlugin extends BasePlugin {
             aarPw.flush()
             aarPw.close()
         }
+    }
+
+    void buildBundle(Project app) {
+        Log.header "Project($app) buildBundle.doLast:  Parse build.gralde dependencies"
+
+        /** 收集aars依赖，过滤lib公共插件依赖，打入Manifest.xml，供后续PPT解析*/
+        // collet D.txt
+
+        // filter lib.* project or aar
+
+        // write Manifest.xml in order to Pdatas Parse Tools(PPT)
+
+        /** 收集Bundle的编译产物到buildCache：实现aar替代project的功能*/
+
     }
 
     private void compatVendors() {

@@ -45,6 +45,9 @@ public class RootExtension extends BaseExtension {
      */
     String publicDir = FD_BUILD_SMALL;
 
+    /**
+     * the output dir of plugin Dest File(*.so)
+     */
     String destOutputDir
 
     /**
@@ -100,15 +103,19 @@ public class RootExtension extends BaseExtension {
     /** Project of Small AAR module */
     protected Project smallProject
 
+    // 很多处在使用:
     /** Project of host */
     protected Project hostProject
 
+    // 很多处在使用: 重点突破项目
     /** Project of host which are automatically dependent by other bundle modules */
     protected Set<Project> hostStubProjects
 
+    // 用于判断isLibProject(): 保留，用于支持compile(':project')模式
     /** Project of lib.* */
     protected Set<Project> libProjects
 
+    // 无意义，可去除
     /** Project of app.* */
     protected Set<Project> appProjects
 
@@ -142,6 +149,7 @@ public class RootExtension extends BaseExtension {
 
         hostModuleName = 'app'
 
+        // todo: 为啥不能去除呢？ -- GradleSync, 就报错I.O异常
         // Create pre Dirs: 可以move到AndroidPlugin
         prepareBuildEnv(project)
 
@@ -188,6 +196,7 @@ public class RootExtension extends BaseExtension {
         def preLinkDir = new File(interDir, FD_PRE_LINK)
         preLinkJarDir = new File(preLinkDir, FD_JAR)
         preLinkAarDir = new File(preLinkDir, FD_AAR)
+
     }
 
 
@@ -329,6 +338,7 @@ public class RootExtension extends BaseExtension {
         if (libProjects != null) {
             found = libProjects.contains(project);
         }
+        // 可去除
         if (!found && hostStubProjects != null) {
             found = hostStubProjects.contains(project);
         }
@@ -348,6 +358,7 @@ public class RootExtension extends BaseExtension {
         if (libProjects != null) {
             found = libProjects.find{ it.name == name } != null;
         }
+        // 可去除
         if (!found && hostStubProjects != null) {
             found = hostStubProjects.find{ it.name == name } != null;
         }

@@ -94,6 +94,7 @@ class AppPlugin extends BundlePlugin {
         // Get all dependencies with gradle script `compile project(':lib.*')'
         DependencySet compilesDependencies = project.configurations.compile.dependencies
 
+        // todo:  分析compile依赖， 需要新增compile 'aar'的依赖分析
         Set<DefaultProjectDependency> allLibs = compilesDependencies.withType(DefaultProjectDependency.class)
         Set<DefaultProjectDependency> smallLibs = []
         mUserLibAars = []
@@ -172,6 +173,8 @@ class AppPlugin extends BundlePlugin {
 
         mLibraryJars.addAll(libDependentJars)
 
+        // todo: 需要移除;
+        // 能否从其他地方获取？ -- 打hostStub时，缓存到buildCache
         // Collect stub and small jars in host
         Set<Project> sharedProjects = []
         sharedProjects.addAll(rootSmall.hostStubProjects)
@@ -184,13 +187,19 @@ class AppPlugin extends BundlePlugin {
             }
             if (jarTask != null) {
                 mLibraryJars.addAll(jarTask.otherFileOutputs)
+                Log.result "[getLibraryJars], mLibraryJars.addAll($jarTask.otherFileOutputs); from($rootSmall.hostStubProjects)"
             }
         }
 
+        // todo: 能否，从其他地方获取，比如publicCache中？
+        // 目前是空的：是否可以直接去除？
         rootSmall.hostProject.tasks.withType(TransformTask.class).each {
             if ((it.variantName == 'release' || it.variantName.contains("Release"))
                     && (it.transform.name == 'dex' || it.transform.name == 'proguard')) {
+                Log.result "[getLibraryJars], add hostProject.TransformTask streamInputs: " + it.streamInputs.findAll { it.name.endsWith('.jar') } +
+                        "; Before size:" + mLibraryJars.size()
                 mLibraryJars.addAll(it.streamInputs.findAll { it.name.endsWith('.jar') })
+                Log.result "[getLibraryJars], After size:" + mLibraryJars.size()
             }
         }
 
@@ -1278,9 +1287,12 @@ class AppPlugin extends BundlePlugin {
     protected static def collectAarsOfLibrary(Project lib, HashSet outAars) {
         // lib.* self
         outAars.add(group: lib.group, name: lib.name, version: lib.version)
+        Log.action("collectAarsOfLibrary", " add($lib.group,$lib.name, $lib.version")
+
         // lib.* self for android plugin 2.3.0+
         File dir = lib.projectDir
         outAars.add(group: dir.parentFile.name, name: dir.name, version: lib.version)
+//        Log.action("collectAarsOfLibrary", " add($dir.parentFile.group,$dir.name, $lib.version")
 
         Log.action("collectAarsOfLibrary", " add $lib.name to outAars($outAars)")
     }
@@ -1290,12 +1302,13 @@ class AppPlugin extends BundlePlugin {
 
         // Pure aars
         File file = new File(rootSmall.preLinkAarDir, dependenciesFileName)
-        collectAars(file, project, outAars)
+        collectAars(file, project, outAars) // project无效，可去除
 
         // Jar-only aars
         file = new File(rootSmall.preLinkJarDir, dependenciesFileName)
-        collectAars(file, project, outAars)
+        collectAars(file, project, outAars) // project无效，可去除
 
+        // collet libProject self aars
         if (isLib) {
             collectAarsOfLibrary(project, outAars)
         }

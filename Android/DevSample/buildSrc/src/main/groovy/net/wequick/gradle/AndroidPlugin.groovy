@@ -135,6 +135,7 @@ class AndroidPlugin extends BasePlugin {
                     return
                 }
 
+                // 无效代码！
                 def aarName = aarPath.module.name
                 if (rootSmall.hostStubProjects.find { it.name == aarName } != null) {
                     return

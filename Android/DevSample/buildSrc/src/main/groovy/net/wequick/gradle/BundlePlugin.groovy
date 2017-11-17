@@ -46,6 +46,7 @@ abstract class BundlePlugin extends AndroidPlugin {
 
         BuildType buildType = android.buildTypes.find { it.name == 'release' }
 
+        // 设置所有插件，统一为宿主的signing; 【可去除】
         Project hostProject = rootSmall.hostProject
         com.android.build.gradle.BaseExtension hostAndroid = hostProject.android
         def hostDebugBuildType = hostAndroid.buildTypes.find { it.name == 'debug' }
