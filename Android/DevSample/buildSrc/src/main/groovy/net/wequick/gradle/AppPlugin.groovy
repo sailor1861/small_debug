@@ -49,17 +49,17 @@ class AppPlugin extends BundlePlugin {
 
     // todo：重点改造项目
     /** 插件依赖的lib插件工程 */
-    protected Set<Project> mDependentLibProjects    // 没有消费者?
-    protected Set<Project> mTransitiveDependentLibProjects  // 等同于mProvidedProjects， 到处使用， 有啥区别呢?
-    protected Set<Project> mProvidedProjects
+    protected Set<Project> mDependentLibProjects    // 等同于mProvidedProjects， LibraryPlugin有使用到
+    protected Set<Project> mTransitiveDependentLibProjects  // 基于mProvidedProjects收集的依赖树，有所有依赖的lib工程， 到处使用; 支持small.splitAars的生成
+    protected Set<Project> mProvidedProjects    // 第一级lib.Project依赖， 协助完成mTransitiveDependentLibProjects的收集
 
     /** 插件依赖的普遍工程 */
     protected Set<Project> mCompiledProjects    // 没有消费者?
-    protected Set<Map> mUserLibAars // App自身依赖的所有Aars，即需要打包保留的Aars
+    protected Set<Map> mUserLibAars // App自身依赖的所有Aars，即需要打包保留的Aars, 赋值给small.retainedAars
 
-    // todo：重点改造项目，新增对ProvidedAar的支持
+    // todo：核心数据结构，重点改造项目，新增对ProvidedAar的支持
     /** 插件所有Provided依赖：只编译，不打包的依赖 */
-    protected Set<File> mLibraryJars
+    protected Set<File> mLibraryJars    // getLibraryJars()时生产， 到处有消费者； 变量用于缓存，提升效率；使用到了上述各种Set<Project>、rootProject等
     protected File mMinifyJar
 
     void apply(Project project) {
@@ -111,7 +111,7 @@ class AppPlugin extends BundlePlugin {
             if (rootSmall.isLibProject(it.dependencyProject)) {
                 smallLibs.add(it)
                 mProvidedProjects.add(it.dependencyProject)
-                mDependentLibProjects.add(it.dependencyProject)     // why: 此处添加完成后，没有在使用？？
+                mDependentLibProjects.add(it.dependencyProject)
             } else {
                 mCompiledProjects.add(it.dependencyProject)
 
@@ -154,6 +154,7 @@ class AppPlugin extends BundlePlugin {
     }
 
     /**
+     * todo: 重点改造项目
      * 获取插件Provided jars
      * @return
      */
@@ -162,32 +163,39 @@ class AppPlugin extends BundlePlugin {
 
         mLibraryJars = new LinkedHashSet<File>()
 
+        // AH方案下， 插件已经通过Provied 依赖了fatJar包，是否可以省略宿主的jars, support前期也不支持;
+        // 宿主自身及依赖.jar
         // Collect the jars in `build-small/intermediates/small-pre-jar/base'
         def baseJars = project.fileTree(dir: rootSmall.preBaseJarDir, include: ['*.jar'])
         mLibraryJars.addAll(baseJars.files)
-        Log.passed "[getLibraryJars] add($baseJars.files) from `build-small/intermediates/small-pre-jar/base'"
+        Log.passed "[getLibraryJars] add($baseJars.files) from `$rootSmall.preBaseJarDir'"
 
+        // 公共插件.jar: 包括公共插件lib/目录下的jar; 那么公共插件自身compile('aar')的jar呢？ 在哪里？
         // Collect the jars of `compile project(lib.*)' with absolute file path, fix issue #65
         Set<String> libJarNames = []
         Set<File> libDependentJars = []
         mTransitiveDependentLibProjects.each {
-            libJarNames += getJarName(it)
-            libDependentJars += getJarDependencies(it)
+            libJarNames += getJarName(it)   // 工程自身的.jar    // todo: aar自身的jar内，可以从pre-jar/libs/下取，也可以直接从explodede-arr/下取
+            libDependentJars += getJarDependencies(it)  // 工程lib/目录下的*.jar  // todo：aar内部，是否也有libjars
         }
 
+        Log.passed "[getLibraryJars] libJarNames($libJarNames)"
         if (libJarNames.size() > 0) {
             def libJars = project.files(libJarNames.collect{
                 new File(rootSmall.preLibsJarDir, it).path
             })
             mLibraryJars.addAll(libJars.files)
+            Log.passed "[getLibraryJars] add libJarNames($libJars.files) from `compile project(lib.*)'"
         }
 
         mLibraryJars.addAll(libDependentJars)
-        Log.passed "[getLibraryJars] add($libDependentJars) from `compile project(lib.*)'"
+        Log.passed "[getLibraryJars] add libDependentJars($libDependentJars) from `compile project(lib.*)'"
+
+        // todo: 仿照project, 支持aar模式
 
 
         // todo : 能否从其他地方获取？ -- 打hostStub时，缓存到buildCache
-        // AH方案下， 插件已经通过Provied 依赖了fatJar包，是否可以省略宿主的jars, support前期也不支持;
+        // 宿主共享库.jar
         // Collect stub and small jars in host
         Set<Project> sharedProjects = []
         sharedProjects.addAll(rootSmall.hostStubProjects)
@@ -200,7 +208,7 @@ class AppPlugin extends BundlePlugin {
             }
             if (jarTask != null) {
                 mLibraryJars.addAll(jarTask.otherFileOutputs)
-                Log.result "[getLibraryJars], mLibraryJars.addAll($jarTask.otherFileOutputs); from($rootSmall.hostStubProjects)"
+                Log.result "[getLibraryJars], addHostStubJars($jarTask.otherFileOutputs); from($rootSmall.hostStubProjects)"
             }
         }
 
@@ -227,6 +235,9 @@ class AppPlugin extends BundlePlugin {
                 D:\code\Small\Android\Sample\app+stub\build\intermediates\bundles\default\libs\assets.jar
         support包：
                 D:\code\Small\Android\DevSample\build-small\intermediates\small-pre-jar\base\com.android.support-animated-vector-drawable-25.1.0.jar,
+                ...
+        lib插件：
+                todo：待添加
 
         todo：
              AH方案下， 插件已经通过Provied 依赖了fatJar包，是否可以省略宿主的jars, support前期也不支持;
@@ -1246,6 +1257,11 @@ class AppPlugin extends BundlePlugin {
         }
     }
 
+    /**
+     * 收集lib插件工程的依赖树，导出所有依赖工程：支持lib插件多级依赖
+     * @param project
+     * @param outLibProjects
+     */
     protected void collectLibProjects(Project project, Set<Project> outLibProjects) {
         DependencySet compilesDependencies = project.configurations.compile.dependencies
         Set<DefaultProjectDependency> allLibs = compilesDependencies.withType(DefaultProjectDependency.class)
@@ -1256,6 +1272,13 @@ class AppPlugin extends BundlePlugin {
                 collectLibProjects(dependency, outLibProjects)
             }
         }
+    }
+
+    /**
+     * 收集lib插件的aar依赖树：支持lib插件多级依赖
+     */
+    protected void collectLibAars() {
+
     }
 
     @Override
@@ -1274,8 +1297,8 @@ class AppPlugin extends BundlePlugin {
 
         // Collect transitive dependent `lib.*' projects
         mTransitiveDependentLibProjects = new HashSet<>()
-        mTransitiveDependentLibProjects.addAll(mProvidedProjects)
-        mProvidedProjects.each {
+        mTransitiveDependentLibProjects.addAll(mProvidedProjects)   // todo: 如果compile的普通工程，内部有依赖lib插件呢，那么现在不能支持！
+        mProvidedProjects.each {    // todo: 改成allProject，就可以支持上述场景！ [待开发]
             collectLibProjects(it, mTransitiveDependentLibProjects)
         }
 
@@ -1289,8 +1312,12 @@ class AppPlugin extends BundlePlugin {
         // Collect aar(s) in host
         collectAarsOfProject(rootSmall.hostProject, false, smallLibAars)
 
+        // todo: Collect aars in libAar
+        collectLibAars()
+
         // 添加工程Provided aar到smallLibAars
         // todo：遍历compile aar依赖；过滤出Provided，添加到smallLibAars队列
+        // 此外还需要过滤出aar的多级依赖
         // smallLibAars += aars;
         if (isProvidedAar()) {
             smallLibAars.add(group: "com.example.mysmall.lib.style", name: "libstyle", version: "0.0.1-SNAPSHOT")
@@ -1299,9 +1326,11 @@ class AppPlugin extends BundlePlugin {
         // 所有上述逻辑：目标就是下述两个数据
         small.splitAars = smallLibAars
         small.retainedAars = mUserLibAars
+
+        Log.result "splitAars($small.splitAars)\n retainedAars($small.retainedAars)"
     }
 
-    // todo: debug
+    // 收集lib工程自身的aar包
     protected static def collectAarsOfLibrary(Project lib, HashSet outAars) {
         // lib.* self
         outAars.add(group: lib.group, name: lib.name, version: lib.version)
@@ -1315,6 +1344,13 @@ class AppPlugin extends BundlePlugin {
         Log.action("collectAarsOfLibrary", " add $lib.name to outAars($outAars)")
     }
 
+    /**
+     * 收集工程的所有Aars依赖
+     * @param project
+     * @param isLib
+     * @param outAars
+     * @return
+     */
     protected def collectAarsOfProject(Project project, boolean isLib, HashSet outAars) {
         String dependenciesFileName = "$project.name-D.txt"
 

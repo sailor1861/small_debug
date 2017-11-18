@@ -6,6 +6,7 @@ import com.android.build.gradle.internal.transforms.ProGuardTransform
 import com.android.build.gradle.internal.tasks.PrepareLibraryTask
 import com.android.build.gradle.tasks.MergeManifests
 import net.wequick.gradle.util.AarPath
+import net.wequick.gradle.util.Log
 import net.wequick.gradle.util.TaskUtils
 import org.gradle.api.Project
 
@@ -79,7 +80,7 @@ class AndroidPlugin extends BasePlugin {
     protected void beforeEvaluate(boolean released) { }
 
     protected void afterEvaluate(boolean released) {
-        // 添加公共依赖
+        // 添加公共Small依赖: 去除
         // Automatic add `small' dependency
         if (rootSmall.smallProject != null) {
             project.dependencies.add(smallCompileType, rootSmall.smallProject)
@@ -221,11 +222,17 @@ class AndroidPlugin extends BasePlugin {
         // Init default output file (*.apk)
         small.outputFile = variant.outputs[0].outputFile
 
-        // 收集工程依赖：非常关键的实现
+        // 收集工程依赖：非常关键的实现;
+        // 需要用到small.buildCaches的地方：
+        // buildLib.doLast ：缓存lib插件的jars
+        // collectVendorAars
+        // prepareSplit
+        // hookAapt
         small.buildCaches = new HashMap<String, File>()
         project.tasks.withType(PrepareLibraryTask.class).each {
             TaskUtils.collectAarBuildCacheDir(it, small.buildCaches)
         }
+        Log.result "[configureReleaseVariant] collectAarBuildCacheDir($small.buildCaches)"
 
         // Hook variant tasks
         variant.assemble.doLast {
