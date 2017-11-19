@@ -117,7 +117,6 @@ class AppPlugin extends BundlePlugin {
 
                 // 收集每一个compile工程的aar依赖库：要支持
                 // todo：新增对compile aar的支持
-                // 问题：如何支持compile的多级依赖呢？
                 collectAarsOfLibrary(it.dependencyProject, mUserLibAars)
             }
         }
@@ -157,7 +156,7 @@ class AppPlugin extends BundlePlugin {
 
     /**
      * todo: 重点改造项目
-     * 获取插件Provided jars
+     * mLibraryJars：新增aar模式支持； 获取插件Provided jars
      * @return
      */
     protected Set<File> getLibraryJars() {
@@ -167,7 +166,7 @@ class AppPlugin extends BundlePlugin {
 
         // AH方案下， 插件已经通过Provied 依赖了fatJar包，是否可以省略宿主的jars, support前期也不支持;
         // 宿主自身及依赖.jar
-        // Collect the jars in `build-small/intermediates/small-pre-jar/base'
+        // Collect the jars in `build-small/intermediates/small-pre-jar/base'，就是宿主工程的编译产物
         def baseJars = project.fileTree(dir: rootSmall.preBaseJarDir, include: ['*.jar'])
         mLibraryJars.addAll(baseJars.files)
         Log.passed "[getLibraryJars] add($baseJars.files) from `$rootSmall.preBaseJarDir'"
@@ -521,6 +520,13 @@ class AppPlugin extends BundlePlugin {
         }
     }
 
+    /**
+     * 收集工程的aar依赖：需要过滤ProvidedCompile('aar')
+     * @param node
+     * @param outFirstLevelAars
+     * @param outTransitiveAars
+     * @return
+     */
     protected boolean collectVendorAars(ResolvedDependency node,
                                         Set<ResolvedDependency> outFirstLevelAars,
                                         Set<Map> outTransitiveAars) {
