@@ -31,7 +31,7 @@ apply plugin: 'net.wequick.small'
 
 small {
     buildToAssets = true
-    strictSplitResources = false
+    strictSplitResources = true
     android {
         compileSdkVersion = 25
         buildToolsVersion = "25.0.2"

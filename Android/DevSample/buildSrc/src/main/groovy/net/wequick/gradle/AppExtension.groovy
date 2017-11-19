@@ -79,7 +79,7 @@ public class AppExtension extends BundleExtension {
      */
     ArrayList retainedTypes
     ArrayList retainedStyleables
-    Map<String, List> vendorTypes
+    Map<String, List> vendorTypes   // 支持如下场景：app工程依赖的aar内，代码访问R.资源; 因此，需要重新编译aar内的R.class
     Map<String, List> vendorStyleables
 
     /** List of all resource types

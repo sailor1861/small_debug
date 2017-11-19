@@ -603,6 +603,15 @@ class AppPlugin extends BundlePlugin {
     }
 
     // 特别关键：保证public.txt内的ID，能够固定下来的机制
+    // 生成保留资源列表（最终输出物retainedTypes）
+    // 生成全量资源列表 (最终输出物2: allTypes)
+    // bundleEntries --》 retainedPublicEntries --》 retainedEntries --》 retainedTypes(最终产物) + libEntries --》allTypes
+    // hostModuleName + mTransitiveDependentLibProjects -> libEntries
+    // 总结：关键在libEntries队列， 要支持aar模式！
+    // 生成Vendor资源列表(最终输出物3: vendorTypes; 【暂时不用关注】
+    // small.retainedAars --> transitiveVendorAars --> vendorTypes
+    // 生成staticIdMaps<bundleId, libId>：用于后续更新arsc、xml等资源内部的resId
+    // libEntries + retainedEntries -> staticIdMaps: 缓存了所有需要更新的资源ID
     /**
      * Prepare retained resource types and resource id maps for package slicing
      */
@@ -614,9 +623,9 @@ class AppPlugin extends BundlePlugin {
         // 收集所有Vendor.aar
         // Check if has any vendor aars
         def firstLevelVendorAars = [] as Set<ResolvedDependency>
-        def transitiveVendorAars = [] as Set<Map>
+        def transitiveVendorAars = [] as Set<Map>   // 目的仅仅是为了vendor types and styleables，使用
         collectVendorAars(firstLevelVendorAars, transitiveVendorAars)
-//        Log.success "[prepareSplit] collectVendorAars(), transitiveVendorAars($transitiveVendorAars)"
+        Log.success "[prepareSplit] collectVendorAars, firstLevelVendorAars($firstLevelVendorAars), transitiveVendorAars($transitiveVendorAars)"
 
         if (firstLevelVendorAars.size() > 0) {
             if (rootSmall.strictSplitResources) {
@@ -633,95 +642,99 @@ class AppPlugin extends BundlePlugin {
             } else {
                 Set<ResolvedDependency> reservedAars = new HashSet<>()
                 firstLevelVendorAars.each {
-                    Log.warn("Using vendor aar '$it.name'")
+                    Log.warn("[prepareSplit] Using vendor aar '$it.name'")
 
                     // If we don't split the aar then we should reserved all it's transitive aars.
                     collectTransitiveAars(it, reservedAars)
                 }
 
                 // 非严格模式下：支持compile工程的多级依赖； -- 这感觉是很普通的模式呀？
+                // 这里是在支持compile aar依赖； 但是也不是lib插件的aar依赖！
                 reservedAars.each {
                     mUserLibAars.add(group: it.moduleGroup, name: it.moduleName, version: it.moduleVersion)
                 }
 
-                Log.success "[prepareSplit] Non-strictSplitResources, mUserLibAars.add($reservedAars))
+                // todo: app.detail, 新增compile ('aar')场景
+                Log.success "[prepareSplit] Non-strictSplitResources, mUserLibAars.add($reservedAars))"
             }
         }
 
-        // 添加所有普通compile的aar ： 目的仅仅是为了vendor types and styleables，使用！
+        // 添加所有普通compile project的aar ： 目的仅仅是为了vendor types and styleables，使用！
         // Add user retained aars for generating their R.java, fix #194
         // 问题：collectVendorAars()时， 没有包括small.retainedAars的内容么？
+        // A: collectVendorAars 仅收集compile('aar')的依赖， 因此需要加上small.retainedAars
         if (small.retainedAars != null) {
             transitiveVendorAars.addAll(small.retainedAars.collect {
                 [path: "$it.group/$it.name/$it.version", version: it.version]
             })
         }
-        Log.success "[prepareSplit] transitiveVendorAars.add($transitiveVendorAars), publicSymbolFile($small.publicSymbolFile)"
+        Log.success "[prepareSplit] transitiveVendorAars($transitiveVendorAars), publicSymbolFile($small.publicSymbolFile)"
 
-        // 从rootSmall.preIdsDir找到非本工程的所有lib库(公共插件)的R.txt文件; 这些资源均是需要过滤掉的
+        // 公共资源：从rootSmall.preIdsDir找到所有本工程依赖的lib库(公共插件)的R.txt文件; 这些资源均是需要过滤掉的
         // 目的：生成staticIdMaps();
-        // Q: 依赖的lib库的R.txt，如何获取？
-        // A: buildLib时，生成到该目录的
         // Prepare id maps (bundle resource id -> library resource id)
         // Map to `lib.**` resources id first, and then the host one.
-        def libEntries = [:]
+        def libEntries = [:]    // 核心数据
         File hostSymbol = new File(rootSmall.preIdsDir, "${rootSmall.hostModuleName}-R.txt")
         if (hostSymbol.exists()) {
             libEntries += SymbolParser.getResourceEntries(hostSymbol)
         }
 
-        // compile project
+        // todo: 为啥要从projectDir取，不是应该从preIdsDir获取么?
+        // collect compile libproject
         mTransitiveDependentLibProjects.each {
             File libSymbol = new File(it.projectDir, 'public.txt')
             libEntries += SymbolParser.getResourceEntries(libSymbol)
         }
 
         // 添加ProvidedCompile aar库的R.txt
-        // todo: 为啥此处缓存的lib.style-R.txt，不是lib.style库的public.txt(等同symbols/R.txt)
+        // todo: 为啥此处缓存的lib.style-R.txt，不是lib.style工程下的public.txt(等同symbols/R.txt)，而是少了一些资源ID;
         if (isProvidedAar()) {
             File aarLibSymbol = new File(rootSmall.preIdsDir, "lib.style-R.txt")
             libEntries += SymbolParser.getResourceEntries(aarLibSymbol)
         }
 
-        /** 工程自身的public.txt */
+        /** 工程自身的public.txt: Map<key, Map> */
         def publicEntries = SymbolParser.getResourceEntries(small.publicSymbolFile)
         /** 工程自身的R.txt：AAPT编译产物，基于他过滤出retianedEntries */
         def bundleEntries = SymbolParser.getResourceEntries(idsFile)
         /** 所有修改的资源ID映射表：IdMaps<bundleId, libId> */
         def staticIdMaps = [:]
         def staticIdStrMaps = [:]
-        /** 工程需要保留的资源：中间产物，目的是生成retainedTypes这个最终产物 */
+        /** 工程需要保留的资源：中间产物，核心数据，目的是生成retainedTypes这个最终产物 */
         def retainedEntries = []
-        /** 工程需要保留的public资源：对应工程自身的Public.txt */
-        def retainedPublicEntries = []
+        /** 工程需要保留的public资源：[Map]；对应工程自身的Public.txt; <= publicEntries */
+        def retainedPublicEntries = []  // 区分工程自身的public，目的是固定和重新排序；
         def retainedStyleables = []
         def reservedKeys = getReservedResourceKeys()
         Log.success "reservedKeys($reservedKeys)"
 
+        // 遍历插件自身的R.txt
         bundleEntries.each { k, Map be ->
             be._typeId = UNSET_TYPEID // for sort
             be._entryId = UNSET_ENTRYID
 
-            // 实现public固定资源ID: 用public.txt，替换R.txt; 以便后续重新javaC生成R.java
+            // 资源类型1 - 【lib插件】插件自身public资源：实现public固定资源ID；用public.txt，替换R.txt; 以便后续重新javaC生成R.java
             // Q: 为啥不替换PP段？ 固定的资源ID呀！
-            // A: 因为是bundle工程自身的资源，PP段，肯定就是bundle的packageId；所以，这里就不处理了？
+            // A: 后续逻辑需要：工程自身的资源，先固定publicId, 然后重新排序，最后统一设置PP段;
             Map le = publicEntries.get(k)
             if (le != null) {
                 // Use last built id
                 be._typeId = le.typeId
                 be._entryId = le.entryId
-                retainedPublicEntries.add(be)
+                retainedPublicEntries.add(be)   // 插件自身需要保留的public资源(实际使用到的) = publicEntries - 已经删除的public资源！
                 publicEntries.remove(k)
                 return
             }
 
             // 添加到保留资源列表
+            // Q: 目的是什么呢？ 优先于公共lib固定资源，避免同类型同名文件么？
             if (reservedKeys.contains(k)) {
                 be.isStyleable ? retainedStyleables.add(be) : retainedEntries.add(be)
                 return
             }
 
-            // 记录所有在lib库的public.txt内的资源ID
+            // 资源类型2 - 公共lib固定资源：记录所有在lib库的public.txt内的资源ID
             le = libEntries.get(k)
             if (le != null) {
                 // Add static id maps to host or library resources and map it later at
@@ -737,7 +750,7 @@ class AppPlugin extends BundlePlugin {
 //                        "Missing library resource entry: \"$k\", try to cleanLib and buildLib.")
 //            }
 
-            // 剩余的资源，就是插件自身的资源：添加到retainedEntries保留列表中
+            // 资源类型3 - 【app插件】剩余的资源，就是插件自身的资源：添加到retainedEntries保留列表中
             be.isStyleable ? retainedStyleables.add(be) : retainedEntries.add(be)
 //            Log.action("prepareSplit", " retainedEntries.add($be), from($k)")
         }
@@ -764,6 +777,7 @@ class AppPlugin extends BundlePlugin {
         }
 
         // 如果没有需要retained的资源，则直接退出
+        Log.passed "retainedPublicEntries($retainedPublicEntries), retainedEntries($retainedEntries)"
         if (retainedEntries.size() == 0 && retainedPublicEntries.size() == 0) {
             small.retainedTypes = [] // Doesn't have any resources
             return
@@ -807,7 +821,7 @@ class AppPlugin extends BundlePlugin {
         }
 
         // 重新分配资源ID：因为public.txt内的资源会随机占用了资源ID段; 会与原始AAPT产物有冲突;
-        // 这一步会合并 etainedEntries += retainedPublicEntries
+        // 这一步会合并 retainedEntries += retainedPublicEntries
         // Reassign resource type id (_typeId) and entry id (_entryId)
         def lastEntryIds = [:]
         if (retainedEntries.size() > 0) {
@@ -853,6 +867,7 @@ class AppPlugin extends BundlePlugin {
 
             retainedEntries += retainedPublicEntries
         } else {
+            // lib插件：所有资源均是public.txt
             retainedEntries = retainedPublicEntries
         }
 
@@ -878,7 +893,7 @@ class AppPlugin extends BundlePlugin {
             // 记录所有IdMaps: 后续，修改XML资源ID时，需要用到
             def newResId = pid | (e._typeId << 16) | e._entryId
             def newResIdStr = "0x${Integer.toHexString(newResId)}"
-            staticIdMaps.put(e.id, newResId)    // 前面已经处理过libEntries(肯定是public固定的), 这里处理剩余的工程自身的ID，因此需要在分配资源后再处理;
+            staticIdMaps.put(e.id, newResId)    // 在此处：才统一固定插件自身资源的PP段：前面已经处理过libEntries(肯定是public固定的), 这里处理剩余的工程自身的ID，因此需要在分配资源(重新排序)后再处理;
             staticIdStrMaps.put(e.idStr, newResIdStr)
 
             // Q: 不懂
@@ -1091,7 +1106,7 @@ class AppPlugin extends BundlePlugin {
         small.vendorStyleables = vendorStyleables
 
         Log.success "prepareSplit: retainedTypes(${small.retainedTypes}) \n        retainedStyleables($retainedStyleables) \n        " +
-                "vendorTypes($vendorTypes)"   //idMaps($staticIdStrMaps), 特别多值
+                "vendorTypes($vendorTypes)"   //idMaps($staticIdStrMaps), 特别多值，风险很大！
     }
 
     protected int getABIFlag() {
@@ -1487,6 +1502,7 @@ class AppPlugin extends BundlePlugin {
         }
     }
 
+    // libRefTable: 新增aar模式支持
     /**
      * Hook aapt task to slice asset package and resolve library resource ids
      */
@@ -1513,6 +1529,7 @@ class AppPlugin extends BundlePlugin {
 //            copyFile(apFile, apFile.getParent(), apFile.name + ".bak")
             org.apache.commons.io.FileUtils.copyFile(apFile, new File(apFile.getParent(), apFile.name + ".bak"))
 
+            // 处理res：找到需要保留的res，需要过滤的res，并固定和分配资源ID 【复杂】
             // Modify assets : 为啥最终生成的apFile，会比原始的多了一个assets呢？
             prepareSplit()
 
@@ -1543,7 +1560,7 @@ class AppPlugin extends BundlePlugin {
                 libRefTable.put(pkgId, pkgName)
             }
 
-            // todo：support Provided aar：
+            // todo：support Provided aar; 如何通过aar包，找到对应的pkgId和pkgName呢？
             //  isProvidedAar(): 很奇怪，此处调用这个方法，就会报错"Could not find method isProvidedAar() for arguments [] on task ':lib.style:processReleaseResources'"
             if (getPluginType().equals(PluginType.App)) {
 //                def pkgId = sPackageIds["com.example.mysmall.lib.style"]
@@ -1551,10 +1568,9 @@ class AppPlugin extends BundlePlugin {
             }
 
             Aapt aapt = new Aapt(unzipApDir, rJavaFile, symbolFile, rev)
-            Log.success "[${project.name}] ReAapt symbolFile($symbolFile), rJavaFile($rJavaFile) unzipApDir($unzipApDir)"
+            Log.success "[${project.name}] ReAAPT symbolFile($symbolFile), rJavaFile($rJavaFile) unzipApDir($unzipApDir)"
 
             if (small.retainedTypes != null && small.retainedTypes.size() > 0) {
-                // 这两段难理解; 只能反推; 屏蔽调后，看看打包结果如何，对比就能看出来作用！
                 // 过滤res/目录：排除掉filteredResources资源
                 aapt.filterResources(small.retainedTypes, filteredResources)
                 Log.success "[${project.name}] split library res files..."
@@ -1567,7 +1583,7 @@ class AppPlugin extends BundlePlugin {
 
                 String pkg = small.packageName
 
-                // 重新生成R.java: 固定publicID, 后续javac编译class文件时，会应用到该类；
+                // 重新生成全部资源的R.java: 固定publicID, 后续javac编译class文件时，会应用到该类；
                 // Overwrite the aapt-generated R.java with full edition: build\generated\source\r\release\net\wequick\example\small\app\mine\R.java
                 aapt.generateRJava(small.rJavaFile, pkg, small.allTypes, small.allStyleables)
                 Log.success "[${project.name}] generateRJava($small.rJavaFile)"
@@ -1580,7 +1596,7 @@ class AppPlugin extends BundlePlugin {
                         small.retainedTypes, small.retainedStyleables)
                 Log.success "[${project.name}] generate split RJava($small.splitRJavaFile)"
 
-                // 场景：依赖的aar内，代码访问R.资源
+                // 场景：app工程依赖的aar内，代码访问R.资源; 这种情况，只需要重新编译aar包内的R.class即可
                 // Overwrite the retained vendor R.java
                 def retainedRFiles = [small.rJavaFile]
                 small.vendorTypes.each { name, types ->
@@ -1606,7 +1622,7 @@ class AppPlugin extends BundlePlugin {
                     }
                 }
 
-                Log.success "[${project.name}] split library R.java files..."
+                Log.success "[${project.name}] split library res files, fix resId And reset pkgId"
             } else {
                 // 如果插件自身没有任何资源：则简单删除所有资源
                 noResourcesFlag = 1
@@ -1637,13 +1653,14 @@ class AppPlugin extends BundlePlugin {
             // 更新AAPT结果：先删除，再重新添加；因为没有update命令；
             //      添加文件，不涉及到编译过程，仅仅是更新压缩内的文件？  -- 所以，此时，清理资源是不会有影响的！
             //      问题：为啥不是对unzip解压&过滤&修改过的文件，重新压缩下 即可？ 为啥要调用AAPT工具，重新对.ap_压缩包处理？
-            // 这一步更新*.ap_文件(包括assets/, res/, Manifest.xml, resource.arsc文件)
+            // 先删除更新和过滤的res;
             // Delete filtered entries.
             // Cause there is no `aapt update' command supported, so for the updated resources
             // we also delete first and run `aapt add' later.
-            filteredResources.addAll(updatedResources)  // 添加Resource.arsc文件，各种有依赖lib资源的XML文件，也需要重新更新
+            filteredResources.addAll(updatedResources)  // 添加Resource.arsc文件，各种有依赖lib资源的XML文件，也需要重新更新；过滤和更新，先一并删除！
             ZipUtils.with(apFile).deleteAll(filteredResources)      //Q: unzip解压包中，已经过滤掉了，为啥还需要再处理.ap_压缩包呢？
 
+            // 再添加更新资源：这一步更新*.ap_文件(包括assets/, res/, Manifest.xml, resource.arsc文件)
             // Re-add updated entries.
             // $ aapt add resources.ap_ file1 file2 ...
             def nullOutput = new ByteArrayOutputStream()
