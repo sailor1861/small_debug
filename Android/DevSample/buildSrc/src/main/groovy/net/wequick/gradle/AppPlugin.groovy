@@ -117,17 +117,19 @@ class AppPlugin extends BundlePlugin {
 
                 // 收集每一个compile工程的aar依赖库：要支持
                 // todo：新增对compile aar的支持
+                // 问题：如何支持compile的多级依赖呢？
                 collectAarsOfLibrary(it.dependencyProject, mUserLibAars)
             }
         }
         // 收集本工程的aar依赖库：要支持
         collectAarsOfLibrary(project, mUserLibAars)
 
-        // 添加默认的hostStub依赖：改为对hostStub的aar依赖; 【重要修改】
+        // 添加默认的hostStub依赖
+        // todo：改为对hostStub的aar依赖; 【重要修改】
         mProvidedProjects.addAll(rootSmall.hostStubProjects)
 
         // 编译lib公共插件时，移除其他module对当前所有libs的依赖
-        // 单独打lib包没有问；如果本地有App+Lib的工程模式，会出现warning!
+        // 单独打lib包没问题；如果本地有App+Lib的工程模式，会出现warning!  -- AH方案，可去除！
         if (rootSmall.isBuildingLibs()) {
             // While building libs, `lib.*' modules are changing to be an application
             // module and cannot be depended by any other modules. To avoid warnings,
@@ -264,6 +266,7 @@ class AppPlugin extends BundlePlugin {
         }
     }
 
+    // 处理Debug下的编译情况，暂时不关注
     @Override
     protected void hookPreDebugBuild() {
         super.hookPreDebugBuild()
@@ -407,6 +410,7 @@ class AppPlugin extends BundlePlugin {
         }
     }
 
+    // project.afterEvaluate
     @Override
     protected void configureReleaseVariant(BaseVariant variant) {
         super.configureReleaseVariant(variant)
@@ -612,6 +616,8 @@ class AppPlugin extends BundlePlugin {
         def firstLevelVendorAars = [] as Set<ResolvedDependency>
         def transitiveVendorAars = [] as Set<Map>
         collectVendorAars(firstLevelVendorAars, transitiveVendorAars)
+//        Log.success "[prepareSplit] collectVendorAars(), transitiveVendorAars($transitiveVendorAars)"
+
         if (firstLevelVendorAars.size() > 0) {
             if (rootSmall.strictSplitResources) {
                 def err = new StringBuilder('In strict mode, we do not allow vendor aars, ')
@@ -632,21 +638,25 @@ class AppPlugin extends BundlePlugin {
                     // If we don't split the aar then we should reserved all it's transitive aars.
                     collectTransitiveAars(it, reservedAars)
                 }
-                // 这个是什么呢？
+
+                // 非严格模式下：支持compile工程的多级依赖； -- 这感觉是很普通的模式呀？
                 reservedAars.each {
                     mUserLibAars.add(group: it.moduleGroup, name: it.moduleName, version: it.moduleVersion)
                 }
+
+                Log.success "[prepareSplit] Non-strictSplitResources, mUserLibAars.add($reservedAars))
             }
         }
 
         // 添加所有普通compile的aar ： 目的仅仅是为了vendor types and styleables，使用！
         // Add user retained aars for generating their R.java, fix #194
+        // 问题：collectVendorAars()时， 没有包括small.retainedAars的内容么？
         if (small.retainedAars != null) {
             transitiveVendorAars.addAll(small.retainedAars.collect {
                 [path: "$it.group/$it.name/$it.version", version: it.version]
             })
         }
-        Log.success "add transitiveVendorAars($transitiveVendorAars), publicSymbolFile($small.publicSymbolFile)"
+        Log.success "[prepareSplit] transitiveVendorAars.add($transitiveVendorAars), publicSymbolFile($small.publicSymbolFile)"
 
         // 从rootSmall.preIdsDir找到非本工程的所有lib库(公共插件)的R.txt文件; 这些资源均是需要过滤掉的
         // 目的：生成staticIdMaps();
@@ -1330,7 +1340,7 @@ class AppPlugin extends BundlePlugin {
         Log.result "splitAars($small.splitAars)\n retainedAars($small.retainedAars)"
     }
 
-    // 收集lib工程自身的aar包
+    // 收集工程自身的aar包
     protected static def collectAarsOfLibrary(Project lib, HashSet outAars) {
         // lib.* self
         outAars.add(group: lib.group, name: lib.name, version: lib.version)
@@ -1345,7 +1355,7 @@ class AppPlugin extends BundlePlugin {
     }
 
     /**
-     * 收集工程的所有Aars依赖
+     * 收集工程的所有Aars依赖树
      * @param project
      * @param isLib
      * @param outAars
@@ -1506,7 +1516,7 @@ class AppPlugin extends BundlePlugin {
             // Modify assets : 为啥最终生成的apFile，会比原始的多了一个assets呢？
             prepareSplit()
 
-            // 工程合成后的R.txt文件: 为啥业务插件，不传递R.txt, 不需要固定public.txt么？
+            // 工程合成后的R.txt文件: 为啥业务插件，不需要传递R.txt, 因为不需要固定public.txt
             // symbolFile: build\intermediates\symbols\release\R.txt
             File symbolFile = (small.type == PluginType.Library) ?
                     new File(it.textSymbolOutputDir, 'R.txt') : null
@@ -1522,15 +1532,18 @@ class AppPlugin extends BundlePlugin {
             // Collect the DynamicRefTable [pkgId => pkgName]
             def libRefTable = [:]
             mTransitiveDependentLibProjects.each {
+                // 找到Project的包名
                 def libAapt = it.tasks.withType(ProcessAndroidResources.class).find {
                     it.variantName.startsWith('release')
                 }
                 def pkgName = libAapt.packageForR
+
+                // 通过包名：找车对应的pkgId
                 def pkgId = sPackageIds[it.name]
                 libRefTable.put(pkgId, pkgName)
             }
 
-            // support Provided aar：
+            // todo：support Provided aar：
             //  isProvidedAar(): 很奇怪，此处调用这个方法，就会报错"Could not find method isProvidedAar() for arguments [] on task ':lib.style:processReleaseResources'"
             if (getPluginType().equals(PluginType.App)) {
 //                def pkgId = sPackageIds["com.example.mysmall.lib.style"]
@@ -1685,10 +1698,10 @@ class AppPlugin extends BundlePlugin {
         addClasspath(javac)
         javac.doLast { JavaCompile it ->
             if (minifyEnabled) return // process later in proguard task
-            if (!small.splitRJavaFile.exists()) return
+            if (!small.splitRJavaFile.exists()) return  // build\generated\source\r\small\net\wequick\example\small\app\mine\R.java
 
-            File classesDir = it.destinationDir
-            File dstDir = new File(classesDir, small.packagePath)
+            File classesDir = it.destinationDir     // build\intermediates\classes\release
+            File dstDir = new File(classesDir, small.packagePath)   // build\intermediates\classes\release\[package]
 
             // Delete the original generated R$xx.class
             dstDir.listFiles().each { f ->
