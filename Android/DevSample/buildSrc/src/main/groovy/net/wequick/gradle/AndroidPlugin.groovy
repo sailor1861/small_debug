@@ -232,7 +232,8 @@ class AndroidPlugin extends BasePlugin {
         project.tasks.withType(PrepareLibraryTask.class).each {
             TaskUtils.collectAarBuildCacheDir(it, small.buildCaches)
         }
-        Log.result "[configureReleaseVariant] collectAarBuildCacheDir($small.buildCaches)"
+        // 所有support包的jar: com.android.support/appcompat-v7/25.1.0:C:\Users\Administrator\.android\build-cache\2111ef8b331d04d7bf1fbda0a12ddbac2b81e305\output
+//        Log.result "[$project][configureReleaseVariant] size($small.buildCaches.size()), collectAarBuildCacheDir($small.buildCaches)"
 
         // Hook variant tasks
         variant.assemble.doLast {

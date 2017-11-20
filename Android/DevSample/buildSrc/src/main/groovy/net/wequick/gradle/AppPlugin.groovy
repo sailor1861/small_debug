@@ -521,7 +521,7 @@ class AppPlugin extends BundlePlugin {
     }
 
     /**
-     * 收集工程的aar依赖：需要过滤ProvidedCompile('aar')
+     * 收集工程单独依赖的aar：过滤lib插件， 需要过滤ProvidedCompile('aar')
      * @param node
      * @param outFirstLevelAars
      * @param outTransitiveAars
@@ -674,7 +674,7 @@ class AppPlugin extends BundlePlugin {
                 [path: "$it.group/$it.name/$it.version", version: it.version]
             })
         }
-        Log.success "[prepareSplit] transitiveVendorAars($transitiveVendorAars), publicSymbolFile($small.publicSymbolFile)"
+        Log.success "[prepareSplit] transitiveVendorAars.add small.retainedAars($transitiveVendorAars), publicSymbolFile($small.publicSymbolFile)"
 
         // 公共资源：从rootSmall.preIdsDir找到所有本工程依赖的lib库(公共插件)的R.txt文件; 这些资源均是需要过滤掉的
         // 目的：生成staticIdMaps();
@@ -1354,25 +1354,25 @@ class AppPlugin extends BundlePlugin {
             smallLibAars.add(group: "com.example.mysmall.lib.style", name: "libstyle", version: "0.0.1-SNAPSHOT")
         }
 
-        // 所有上述逻辑：目标就是下述两个数据
+        // 所有上述逻辑：目标就是下述两个核心数据
         small.splitAars = smallLibAars
         small.retainedAars = mUserLibAars
 
-        Log.result "splitAars($small.splitAars)\n retainedAars($small.retainedAars)"
+        Log.result "[$project.name] [hookPreReleaseBuild] splitAars($small.splitAars)\n retainedAars($small.retainedAars)"
     }
 
     // 收集工程自身的aar包
     protected static def collectAarsOfLibrary(Project lib, HashSet outAars) {
         // lib.* self
         outAars.add(group: lib.group, name: lib.name, version: lib.version)
-        Log.action("collectAarsOfLibrary", " add($lib.group,$lib.name, $lib.version")
+        Log.action(" collectAarsOfLibrary", " add($lib.group,$lib.name, $lib.version")
 
         // lib.* self for android plugin 2.3.0+
         File dir = lib.projectDir
         outAars.add(group: dir.parentFile.name, name: dir.name, version: lib.version)
 //        Log.action("collectAarsOfLibrary", " add($dir.parentFile.group,$dir.name, $lib.version")
 
-        Log.action("collectAarsOfLibrary", " add $lib.name to outAars($outAars)")
+        Log.action(" collectAarsOfLibrary", " add $lib.name to outAars($outAars)")
     }
 
     /**
@@ -1398,7 +1398,7 @@ class AppPlugin extends BundlePlugin {
             collectAarsOfLibrary(project, outAars)
         }
 
-        Log.action("collectAarsOfLibrary", " add $project.name to outAars($outAars), isLib($isLib)")
+        Log.action(super.project.name + " collectAarsOfProject", " add $project.name to outAars($outAars), isLib($isLib)")
     }
 
     private def hookProcessManifest(Task processManifest) {

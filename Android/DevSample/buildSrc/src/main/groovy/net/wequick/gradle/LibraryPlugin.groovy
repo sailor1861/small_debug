@@ -142,7 +142,7 @@ class LibraryPlugin extends AppPlugin {
                 FileUtils.copyFile(mMinifyJar, jarFile)
             } else {
                 project.ant.jar(baseDir: small.javac.destinationDir, destFile: jarFile)
-//                Log.success "jar dir($small.javac.destinationDir) to destFile($jarFile)"
+                Log.success "jar dir($small.javac.destinationDir) to destFile($jarFile)"
             }
 
             // 更新自身的public.txt
