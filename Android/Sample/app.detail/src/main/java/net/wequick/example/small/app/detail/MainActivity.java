@@ -61,6 +61,7 @@ public class MainActivity extends AppCompatActivity {
         new StyleTestJava().add(1, 14);
 
         // App插件在代码中访问lib插件的R.java: 要求资源ID固定
-        Log.i(TAG, "R.color.colorLight: " + Integer.toHexString(R.color.colorLight) + "; colorPrimaryDark: " + Integer.toHexString(R.color.colorPrimaryDark));
+        Log.i(TAG, "R.color.colorLight: " + Integer.toHexString(R.color.colorLight) + "; colorPrimaryDark: " + Integer.toHexString(R.color.colorPrimaryDark) +
+                "; [lib.utils]R.color.my_test_color2: " + Integer.toHexString(R.color.my_test_color2));
     }
 }

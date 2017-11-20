@@ -1358,7 +1358,7 @@ class AppPlugin extends BundlePlugin {
         small.splitAars = smallLibAars
         small.retainedAars = mUserLibAars
 
-        Log.result "[$project.name] [hookPreReleaseBuild] splitAars($small.splitAars)\n retainedAars($small.retainedAars)"
+        Log.result "[$small.packageName] [hookPreReleaseBuild] splitAars($small.splitAars)\n retainedAars($small.retainedAars)"
     }
 
     // 收集工程自身的aar包
@@ -1398,7 +1398,7 @@ class AppPlugin extends BundlePlugin {
             collectAarsOfLibrary(project, outAars)
         }
 
-        Log.action(super.project.name + " collectAarsOfProject", " add $project.name to outAars($outAars), isLib($isLib)")
+        Log.action(small.packageName + " collectAarsOfProject", " add $project.name to outAars($outAars), isLib($isLib)")
     }
 
     private def hookProcessManifest(Task processManifest) {
